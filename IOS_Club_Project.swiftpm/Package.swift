@@ -19,8 +19,8 @@ let package = Package(
             bundleIdentifier: "IOSAppClub.IOS-Club-Project",
             displayVersion: "1.0",
             bundleVersion: "1",
-            appIcon: .placeholder(icon: .note),
-            accentColor: .presetColor(.yellow),
+            appIcon: .placeholder(icon: .beachball),
+            accentColor: .presetColor(.brown),
             supportedDeviceFamilies: [
                 .pad,
                 .phone
