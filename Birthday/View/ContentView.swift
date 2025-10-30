@@ -8,14 +8,10 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var contactsVM = //Add the ViewModel to access contacts here please
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
+        BirthdaySenderView(allContacts: contactsVM.contacts)
     }
 }
 
