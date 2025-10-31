@@ -7,13 +7,18 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		32B301D72EB2DE5F0069DA79 /* Birthday.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Birthday.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		32B301D72EB2DE5F0069DA79 /* Birthday.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = Birthday.app; path = "/Users/jadentran/Desktop/IOS_Bootcamp_Project/build/Debug-iphoneos/Birthday.app"; sourceTree = "<absolute>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		32B301D92EB2DE5F0069DA79 /* Birthday */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Birthday;
+			sourceTree = "<group>";
+		};
+		B80A04022EB5449C00CA24B7 /* UI */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = UI;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -33,16 +38,8 @@
 			isa = PBXGroup;
 			children = (
 				32B301D92EB2DE5F0069DA79 /* Birthday */,
-				32B301D82EB2DE5F0069DA79 /* Products */,
+				B80A04022EB5449C00CA24B7 /* UI */,
 			);
-			sourceTree = "<group>";
-		};
-		32B301D82EB2DE5F0069DA79 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				32B301D72EB2DE5F0069DA79 /* Birthday.app */,
-			);
-			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -62,6 +59,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				32B301D92EB2DE5F0069DA79 /* Birthday */,
+				B80A04022EB5449C00CA24B7 /* UI */,
 			);
 			name = Birthday;
 			packageProductDependencies = (
@@ -95,7 +93,7 @@
 			mainGroup = 32B301CE2EB2DE5F0069DA79;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = 32B301D82EB2DE5F0069DA79 /* Products */;
+			productRefGroup = 32B301CE2EB2DE5F0069DA79;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
