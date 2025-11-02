@@ -12,8 +12,8 @@ import MessageUI
 struct BirthdaySenderView: View {
     @StateObject private var vm = BirthdayMessageViewModel()
 
-    // pretend you already loaded contacts somewhere else
-    let allContacts: [CNContact]
+    // now accepts [Contact] instead of [CNContact]
+    let allContacts: [Contact]
 
     var body: some View {
         VStack(spacing: 16) {
@@ -59,7 +59,7 @@ struct BirthdaySenderView: View {
                     vm.composerFinished()
                 }
             } else {
-                Text("This device can’t send Messages.")
+                Text("This device can't send Messages.")
                     .padding()
             }
         }

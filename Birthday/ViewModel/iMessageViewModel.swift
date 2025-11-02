@@ -3,6 +3,8 @@ import Contacts
 import Foundation
 import Combine
 
+let contactsManager = ContactsManager()
+
 enum MessageTone: String, CaseIterable, Identifiable {
     case formal, casual, funny, romantic
     var id: String { rawValue }
@@ -16,9 +18,9 @@ struct MessageTemplates {
             return "Happy birthday, \(name). Wishing you a wonderful year ahead."
         case .casual:
             if let age {
-                return "Happy birthday, \(name)! You're now \(age). Hope it’s a great one 🎉"
+                return "Happy birthday, \(name)! You're now \(age). Hope it's a great one 🎉"
             } else {
-                return "Happy birthday, \(name)! Hope it’s a great one 🎉"
+                return "Happy birthday, \(name)! Hope it's a great one 🎉"
             }
         case .funny:
             return "HBD \(name)! Another lap around the sun — level \(age ?? 0) unlocked 🥳"
@@ -30,7 +32,7 @@ struct MessageTemplates {
 
 final class BirthdayMessageViewModel: ObservableObject {
     // contacts whose birthday is today
-    @Published var todaysBirthdayContacts: [CNContact] = []
+    @Published var todaysBirthdayContacts: [Contact] = []
 
     // index of the current person
     @Published private(set) var currentIndex: Int = 0
@@ -46,8 +48,8 @@ final class BirthdayMessageViewModel: ObservableObject {
     // errors
     @Published var lastError: String?
 
-    // entry point
-    func startBirthdayFlow(with contacts: [CNContact]) {
+    // entry point - now takes Contact array instead of CNContact array
+    func startBirthdayFlow(with contacts: [Contact]) {
         let todays = contacts.filter { Self.isBirthdayToday($0.birthday) }
 
         guard !todays.isEmpty else {
@@ -74,7 +76,7 @@ final class BirthdayMessageViewModel: ObservableObject {
         let contact = todaysBirthdayContacts[currentIndex]
 
         // phone
-        guard let rawPhone = contact.phoneNumbers.first?.value.stringValue else {
+        guard let rawPhone = contact.phoneNumber else {
             lastError = "No phone number for \(displayName(for: contact))."
             advanceToNextContact()
             return
@@ -108,14 +110,13 @@ final class BirthdayMessageViewModel: ObservableObject {
 
     // MARK: helpers
 
-    private func displayName(for contact: CNContact) -> String {
-        if !contact.givenName.isEmpty {
-            return contact.givenName
-        } else if !contact.familyName.isEmpty {
-            return contact.familyName
-        } else {
+    private func displayName(for contact: Contact) -> String {
+        let trimmedName = contact.name.trimmingCharacters(in: .whitespaces)
+        if trimmedName.isEmpty || trimmedName == "No Name" {
             return "there"
         }
+        // Return first name only (split on space and take first component)
+        return trimmedName.components(separatedBy: " ").first ?? "there"
     }
 
     private static func isBirthdayToday(_ comps: DateComponents?) -> Bool {
