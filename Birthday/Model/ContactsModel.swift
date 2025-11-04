@@ -8,7 +8,8 @@ import Foundation
 import Contacts
 
 /// Represents a contact with essential information
-struct Contact {
+struct Contact: Identifiable {
+    let id = UUID()
     let name: String
     let phoneNumber: String?
     let birthday: DateComponents?
@@ -18,7 +19,7 @@ struct Contact {
     var comparableBirthday: Date? {
         guard let birthday = birthday else { return nil }
         
-        var calendar = Calendar.current
+        let calendar = Calendar.current
         let currentYear = calendar.component(.year, from: Date())
         
         var dateComponents = DateComponents()
@@ -28,7 +29,16 @@ struct Contact {
         
         return calendar.date(from: dateComponents)
     }
+    
+    var daysToBirthday: Int? {
+        guard let nextBirthdayDate = comparableBirthday?.nextBirthday() else { return nil }
+        let calendar = Calendar.current
+        let days = calendar.dateComponents([.day], from: Date(), to: nextBirthdayDate).day
+        return days
+    }
 }
+
+
 
 /// Manages fetching and sorting contacts
 class ContactsManager {
@@ -174,5 +184,40 @@ class ContactsManager {
         
         // If neither has a birthday, maintain original order
         return true
+    }
+    
+    
+}
+
+extension Date {
+    func formattedMonthDay() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: self)
+    }
+    
+    func nextBirthday() -> Date {
+        let today = Date()
+        return self < today
+            ? Calendar.current.date(byAdding: .year, value: 1, to: self)!
+            : self
+    }
+    
+    func formattedDate() -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .long
+        return formatter.string(from: self)
+    }
+    
+    func monthAbbrev() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM"
+        return formatter.string(from: self)
+    }
+    
+    func day() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "dd"
+        return formatter.string(from: self)
     }
 }

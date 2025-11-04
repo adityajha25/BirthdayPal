@@ -1,136 +1,75 @@
-import SwiftUI
-import Contacts
+//
+//  File 2.swift
+//  BirthdayUI
+//
+//  Created by Jaden Tran on 11/3/25.
+//
+
 import Foundation
 import Combine
 
-let contactsManager = ContactsManager()
-
-enum MessageTone: String, CaseIterable, Identifiable {
-    case formal, casual, funny, romantic
-    var id: String { rawValue }
-}
-
-// Takes in tone, name, optional age and returns a message.
-struct MessageTemplates {
-    static func make(tone: MessageTone, name: String, age: Int?) -> String {
-        switch tone {
-        case .formal:
-            return "Happy birthday, \(name). Wishing you a wonderful year ahead."
-        case .casual:
-            if let age {
-                return "Happy birthday, \(name)! You're now \(age). Hope it's a great one 🎉"
-            } else {
-                return "Happy birthday, \(name)! Hope it's a great one 🎉"
+@available(iOS 17.0, *)
+@Observable class ContactViewModel {
+    
+    var contacts: [Contact]
+    
+    init(contacts: [Contact] = []) {
+        self.contacts = contacts
+    }
+    
+    var sortedUpcoming: [Contact] {
+        contacts.sorted {
+            guard let d1 = $0.comparableBirthday,
+                  let d2 = $1.comparableBirthday else {
+                return $0.comparableBirthday != nil
             }
-        case .funny:
-            return "HBD \(name)! Another lap around the sun — level \(age ?? 0) unlocked 🥳"
-        case .romantic:
-            return "Happy birthday, \(name) ❤️ So grateful for you—hope today is perfect."
+            return d1.nextBirthday() < d2.nextBirthday()
         }
     }
-}
-
-final class BirthdayMessageViewModel: ObservableObject {
-    // contacts whose birthday is today
-    @Published var todaysBirthdayContacts: [Contact] = []
-
-    // index of the current person
-    @Published private(set) var currentIndex: Int = 0
-
-    // UI flags
-    @Published var showTemplatePicker: Bool = false
-    @Published var showComposer: Bool = false
-
-    // data for composer
-    @Published var composerRecipients: [String] = []
-    @Published var composerBody: String = ""
-
-    // errors
-    @Published var lastError: String?
-
-    // entry point - now takes Contact array instead of CNContact array
-    func startBirthdayFlow(with contacts: [Contact]) {
-        let todays = contacts.filter { Self.isBirthdayToday($0.birthday) }
-
-        guard !todays.isEmpty else {
-            lastError = "No birthdays today 🎂"
-            return
+    
+    var contactsWithBirthday: [Contact] {
+        sortedUpcoming.filter { $0.comparableBirthday != nil }
+    }
+    
+    var contactsWithoutBirthday: [Contact] {
+        sortedUpcoming.filter { $0.comparableBirthday == nil }
+    }
+    
+    var birthdaysThisMonthCount: Int {
+        let calendar = Calendar.current
+        let currentMonth = calendar.component(.month, from: Date())
+        
+        return contactsWithBirthday.filter {
+            guard let month = $0.birthday?.month else { return false }
+            return month == currentMonth
+        }.count
+    }
+    
+    var birthdaysThisMonth: [Contact] {
+        let calendar = Calendar.current
+        let currentMonth = calendar.component(.month, from: Date())
+        
+        return contactsWithBirthday.filter {
+            guard let month = $0.birthday?.month else { return false }
+            return month == currentMonth
+        }
+    }
+    
+    
+    func contactsPerMonth(monthName: String) -> [Contact] {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM"
+        
+        guard let monthDate = dateFormatter.date(from: monthName.capitalized) else {
+            return []
         }
 
-        todaysBirthdayContacts = todays
-        currentIndex = 0
-        presentTemplateForCurrentContact()
-    }
-
-    private func presentTemplateForCurrentContact() {
-        guard currentIndex < todaysBirthdayContacts.count else {
-            // all done
-            showTemplatePicker = false
-            showComposer = false
-            return
+        let monthNumber = Calendar.current.component(.month, from: monthDate)
+        
+        return contactsWithBirthday.filter {
+            guard let contactMonth = $0.birthday?.month else { return false }
+            return contactMonth == monthNumber
         }
-        showTemplatePicker = true
     }
 
-    func userSelectedTemplate(_ tone: MessageTone) {
-        let contact = todaysBirthdayContacts[currentIndex]
-
-        // phone
-        guard let rawPhone = contact.phoneNumber else {
-            lastError = "No phone number for \(displayName(for: contact))."
-            advanceToNextContact()
-            return
-        }
-        let phone = rawPhone.filter(\.isNumber)
-        guard !phone.isEmpty else {
-            lastError = "No valid phone for \(displayName(for: contact))."
-            advanceToNextContact()
-            return
-        }
-
-        let name = displayName(for: contact)
-        let age = Self.age(from: contact.birthday)
-
-        composerRecipients = [phone]
-        composerBody = MessageTemplates.make(tone: tone, name: name, age: age)
-
-        showTemplatePicker = false
-        showComposer = true
-    }
-
-    func composerFinished() {
-        showComposer = false
-        advanceToNextContact()
-    }
-
-    private func advanceToNextContact() {
-        currentIndex += 1
-        presentTemplateForCurrentContact()
-    }
-
-    // MARK: helpers
-
-    private func displayName(for contact: Contact) -> String {
-        let trimmedName = contact.name.trimmingCharacters(in: .whitespaces)
-        if trimmedName.isEmpty || trimmedName == "No Name" {
-            return "there"
-        }
-        // Return first name only (split on space and take first component)
-        return trimmedName.components(separatedBy: " ").first ?? "there"
-    }
-
-    private static func isBirthdayToday(_ comps: DateComponents?) -> Bool {
-        guard let comps,
-              let month = comps.month,
-              let day = comps.day else { return false }
-
-        let today = Calendar.current.dateComponents([.month, .day], from: Date())
-        return today.month == month && today.day == day
-    }
-
-    private static func age(from comps: DateComponents?) -> Int? {
-        guard let comps,
-              let dob = Calendar.current.date(from: comps) else { return nil }
-        return Calendar.current.dateComponents([.year], from: dob, to: Date()).year
-    }
 }
