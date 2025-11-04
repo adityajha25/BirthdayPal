@@ -12,12 +12,7 @@ struct ContentView: View {
 
 @available(iOS 17.0, *)
 struct LandingPage: View {
-    private let manager = ContactsManager()
-    @State var contactsVM = ContactViewModel(contacts: [
-        Contact(name: "Alice", phoneNumber: "123-456-7890", birthday: DateComponents(month: 11, day: 10)),
-        Contact(name: "Bob", phoneNumber: nil, birthday: nil),
-        Contact(name: "Charlie", phoneNumber: "987-654-3210", birthday: DateComponents(month: 12, day: 1)),
-    ])
+    @State var contactsVM = ContactViewModel()
 
     var body: some View{
         NavigationStack {
@@ -36,25 +31,71 @@ struct LandingPage: View {
                         Spacer()
                         Text("\(contactsVM.birthdaysThisMonthCount) this month").foregroundStyle(.white).font(.title3)
                     }.padding()
-                    ScrollView {
-                        ForEach(contactsVM.contactsWithBirthday) {contact in
-                            NavigationLink(destination: editView()) {
-                                BdayCard(contact: contact, screenwidth: geometry.size.width, screenheight: geometry.size.height)
+                    
+                    // Add loading and error states
+                    if contactsVM.isLoading {
+                        Spacer()
+                        ProgressView("Loading contacts...")
+                            .foregroundColor(.white)
+                            .tint(.white)
+                        Spacer()
+                    } else if let error = contactsVM.errorMessage {
+                        Spacer()
+                        VStack(spacing: 16) {
+                            Text("Error loading contacts")
+                                .foregroundStyle(.white)
+                                .font(.title3)
+                            Text(error)
+                                .foregroundStyle(.gray)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                            Button("Retry") {
+                                contactsVM.loadContacts()
+                            }
+                            .padding()
+                            .background(Color.white)
+                            .foregroundColor(.black)
+                            .cornerRadius(10)
+                        }
+                        Spacer()
+                    } else if contactsVM.contactsWithBirthday.isEmpty {
+                        Spacer()
+                        VStack(spacing: 12) {
+                            Image(systemName: "birthday.cake")
+                                .font(.system(size: 60))
+                                .foregroundColor(.gray)
+                            Text("No upcoming birthdays")
+                                .foregroundStyle(.white)
+                                .font(.title3)
+                            Text("Add birthdays to your contacts to see them here")
+                                .foregroundStyle(.gray)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                        }
+                        Spacer()
+                    } else {
+                        ScrollView {
+                            ForEach(contactsVM.contactsWithBirthday) {contact in
+                                NavigationLink(destination: editView()) {
+                                    BdayCard(contact: contact, screenwidth: geometry.size.width, screenheight: geometry.size.height)
+                                }
                             }
                         }
                     }
+                    
                     AchievementCardView()
                     
                     NavigationLink(destination: BrowseBirthdaysView(contactsVM: contactsVM)) {
                         browseMonth(screenwidth: geometry.size.width, screenheight: geometry.size.height)
-
                     }
                     
                 }.frame(width: geometry.size.width, height: geometry.size.height).background(.black)
             }
         }
+        .onAppear {
+            contactsVM.loadContacts()
+        }
     }
-    
 }
 
 struct browseMonth: View {
