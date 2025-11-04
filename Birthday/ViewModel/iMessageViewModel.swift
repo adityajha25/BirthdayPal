@@ -79,6 +79,17 @@ import Combine
         }
     }
     
+    func contactsPerDate(date: Date) -> [Contact] {
+        let calendar = Calendar.current
+        let targetMonth = calendar.component(.month, from: date)
+        let targetDay = calendar.component(.day, from: date)
+        
+        return contactsWithBirthday.filter {
+            guard let birthday = $0.birthday else { return false }
+            return birthday.month == targetMonth && birthday.day == targetDay
+        }
+    }
+    
     func contactsPerMonth(monthName: String) -> [Contact] {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM"
