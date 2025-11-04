@@ -1,4 +1,6 @@
 import SwiftUI
+import Contacts
+import MessageUI
 
 struct ContentView: View {
     var body: some View {
@@ -76,7 +78,7 @@ struct LandingPage: View {
                     } else {
                         ScrollView {
                             ForEach(contactsVM.contactsWithBirthday) {contact in
-                                NavigationLink(destination: editView()) {
+                                NavigationLink(destination: editView(contact: contact)) {
                                     BdayCard(contact: contact, screenwidth: geometry.size.width, screenheight: geometry.size.height)
                                 }
                             }
@@ -222,13 +224,110 @@ struct BdayCard: View {
             }.padding(.horizontal)
     }
 }
-
-struct editView : View {
+struct editView: View {
+    var contact: Contact
+    @StateObject private var messageVM = BirthdayMessageViewModel()
+    @Environment(\.dismiss) var dismiss
+    
     var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            
+            VStack(spacing: 20) {
+                Text("Send Birthday Message")
+                    .font(.title)
+                    .foregroundColor(.white)
+                
+                Text(contact.name)
+                    .font(.headline)
+                    .foregroundColor(.gray)
+                
+                Spacer()
+                
+                Button(action: {
+                    let cnContact = convertToCNContact(contact)
+                    messageVM.startBirthdayFlow(with: [cnContact])
+                }) {
+                    HStack {
+                        Image(systemName: "message.fill")
+                        Text("Send Message")
+                    }
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color.blue)
+                    .cornerRadius(12)
+                }
+                .padding(.horizontal)
+                
+                Spacer()
+            }
+        }
+        .sheet(isPresented: $messageVM.showTemplatePicker) {
+            MessageTemplatePickerView(messageVM: messageVM)
+        }
+        .fullScreenCover(isPresented: $messageVM.showComposer) {
+            if MFMessageComposeViewController.canSendText() {
+                MessageComposerView(
+                    recipients: messageVM.composerRecipients,
+                    body: messageVM.composerBody,
+                    onFinish: { _ in
+                        messageVM.composerFinished()
+                        dismiss()
+                    }
+                )
+                .ignoresSafeArea()
+            } else {
+                VStack(spacing: 20) {
+                    Text("Cannot Send Messages")
+                        .font(.headline)
+                    Text("This device is not configured to send messages.")
+                        .multilineTextAlignment(.center)
+                    Button("OK") {
+                        messageVM.showComposer = false
+                    }
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                }
+                .padding()
+            }
+        }
+        .alert("Error", isPresented: .constant(messageVM.lastError != nil)) {
+            Button("OK") {
+                messageVM.lastError = nil
+            }
+        } message: {
+            if let error = messageVM.lastError {
+                Text(error)
+            }
+        }
+    }
+    
+    private func convertToCNContact(_ contact: Contact) -> CNContact {
+        let cnContact = CNMutableContact()
         
+        let nameComponents = contact.name.components(separatedBy: " ")
+        if nameComponents.count > 0 {
+            cnContact.givenName = nameComponents[0]
+        }
+        if nameComponents.count > 1 {
+            cnContact.familyName = nameComponents[1...].joined(separator: " ")
+        }
+        
+        if let phoneNumber = contact.phoneNumber {
+            let phone = CNLabeledValue(label: CNLabelPhoneNumberMain, value: CNPhoneNumber(stringValue: phoneNumber))
+            cnContact.phoneNumbers = [phone]
+        }
+        
+        if let birthday = contact.birthday {
+            cnContact.birthday = birthday
+        }
+        
+        return cnContact.copy() as! CNContact
     }
 }
-
 @available(iOS 17.0, *)
 struct BrowseBirthdaysView: View {
     @State private var selectedMonth = "January"

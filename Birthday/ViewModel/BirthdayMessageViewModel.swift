@@ -1,0 +1,227 @@
+import SwiftUI
+import Contacts
+import Foundation
+import Combine
+
+enum MessageTone: String, CaseIterable, Identifiable {
+    case formal, casual, funny, romantic
+    var id: String { rawValue }
+}
+
+// Message Template Picker View
+struct MessageTemplatePickerView: View {
+    @ObservedObject var messageVM: BirthdayMessageViewModel
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                
+                VStack(spacing: 20) {
+                    if messageVM.todaysBirthdayContacts.isEmpty {
+                        Text("No contact selected")
+                            .foregroundColor(.gray)
+                    } else {
+                        let contact = messageVM.todaysBirthdayContacts[messageVM.currentIndex]
+                        
+                        // Header
+                        VStack(spacing: 8) {
+                            Text("🎉")
+                                .font(.system(size: 60))
+                            Text("Send Birthday Message")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                            Text("to \(displayName(for: contact))")
+                                .font(.headline)
+                                .foregroundColor(.gray)
+                        }
+                        .padding(.top, 40)
+                        
+                        Spacer()
+                        
+                        // Template Options
+                        VStack(spacing: 16) {
+                            Text("Choose a message style:")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                            
+                            ForEach(MessageTone.allCases) { tone in
+                                Button(action: {
+                                    messageVM.userSelectedTemplate(tone)
+                                    dismiss()
+                                }) {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack {
+                                            Text(tone.rawValue.capitalized)
+                                                .font(.headline)
+                                                .foregroundColor(.white)
+                                            Spacer()
+                                            Image(systemName: "chevron.right")
+                                                .foregroundColor(.gray)
+                                        }
+                                        
+                                        Text(messagePreview(for: tone, contact: contact))
+                                            .font(.subheadline)
+                                            .foregroundColor(.gray)
+                                            .lineLimit(2)
+                                    }
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color(white: 0.15))
+                                    .cornerRadius(12)
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                        
+                        Spacer()
+                        
+                        Button("Cancel") {
+                            dismiss()
+                        }
+                        .foregroundColor(.gray)
+                        .padding(.bottom, 20)
+                    }
+                }
+            }
+            .navigationBarHidden(true)
+        }
+    }
+    
+    private func displayName(for contact: CNContact) -> String {
+        if !contact.givenName.isEmpty {
+            return contact.givenName
+        } else if !contact.familyName.isEmpty {
+            return contact.familyName
+        } else {
+            return "there"
+        }
+    }
+    
+    private func messagePreview(for tone: MessageTone, contact: CNContact) -> String {
+        let name = displayName(for: contact)
+        let age = calculateAge(from: contact.birthday)
+        return MessageTemplates.make(tone: tone, name: name, age: age)
+    }
+    
+    private func calculateAge(from birthday: DateComponents?) -> Int? {
+        guard let birthday = birthday,
+              let dob = Calendar.current.date(from: birthday) else { return nil }
+        return Calendar.current.dateComponents([.year], from: dob, to: Date()).year
+    }
+}
+// Takes in tone, name, optional age and returns a message.
+struct MessageTemplates {
+    static func make(tone: MessageTone, name: String, age: Int?) -> String {
+        switch tone {
+        case .formal:
+            return "Happy birthday, \(name). Wishing you a wonderful year ahead."
+        case .casual:
+            if let age {
+                return "Happy birthday, \(name)! You're now \(age). Hope it's a great one 🎉"
+            } else {
+                return "Happy birthday, \(name)! Hope it's a great one 🎉"
+            }
+        case .funny:
+            return "HBD \(name)! Another lap around the sun — level \(age ?? 0) unlocked 🥳"
+        case .romantic:
+            return "Happy birthday, \(name) ❤️ So grateful for you—hope today is perfect."
+        }
+    }
+}
+final class BirthdayMessageViewModel: ObservableObject {
+    // contacts for messaging
+    @Published var todaysBirthdayContacts: [CNContact] = []
+
+    // index of the current person
+    @Published private(set) var currentIndex: Int = 0
+
+    // UI flags
+    @Published var showTemplatePicker: Bool = false
+    @Published var showComposer: Bool = false
+
+    // data for composer
+    @Published var composerRecipients: [String] = []
+    @Published var composerBody: String = ""
+
+    // errors
+    @Published var lastError: String?
+
+    // entry point - accepts any contact
+    func startBirthdayFlow(with contacts: [CNContact]) {
+        guard !contacts.isEmpty else {
+            lastError = "No contact selected"
+            return
+        }
+
+        todaysBirthdayContacts = contacts
+        currentIndex = 0
+        presentTemplateForCurrentContact()
+    }
+
+    private func presentTemplateForCurrentContact() {
+        guard currentIndex < todaysBirthdayContacts.count else {
+            // all done
+            showTemplatePicker = false
+            showComposer = false
+            return
+        }
+        showTemplatePicker = true
+    }
+
+    func userSelectedTemplate(_ tone: MessageTone) {
+        let contact = todaysBirthdayContacts[currentIndex]
+
+        // phone
+        guard let rawPhone = contact.phoneNumbers.first?.value.stringValue else {
+            lastError = "No phone number for \(displayName(for: contact))."
+            advanceToNextContact()
+            return
+        }
+        let phone = rawPhone.filter(\.isNumber)
+        guard !phone.isEmpty else {
+            lastError = "No valid phone for \(displayName(for: contact))."
+            advanceToNextContact()
+            return
+        }
+
+        let name = displayName(for: contact)
+        let age = Self.age(from: contact.birthday)
+
+        composerRecipients = [phone]
+        composerBody = MessageTemplates.make(tone: tone, name: name, age: age)
+
+        showTemplatePicker = false
+        showComposer = true
+    }
+
+    func composerFinished() {
+        showComposer = false
+        advanceToNextContact()
+    }
+
+    private func advanceToNextContact() {
+        currentIndex += 1
+        presentTemplateForCurrentContact()
+    }
+
+    // MARK: helpers
+
+    private func displayName(for contact: CNContact) -> String {
+        if !contact.givenName.isEmpty {
+            return contact.givenName
+        } else if !contact.familyName.isEmpty {
+            return contact.familyName
+        } else {
+            return "there"
+        }
+    }
+
+    private static func age(from comps: DateComponents?) -> Int? {
+        guard let comps,
+              let dob = Calendar.current.date(from: comps) else { return nil }
+        return Calendar.current.dateComponents([.year], from: dob, to: Date()).year
+    }
+}

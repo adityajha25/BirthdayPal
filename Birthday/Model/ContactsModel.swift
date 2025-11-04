@@ -62,12 +62,19 @@ class ContactsManager {
                 return
             }
             
-            do {
-                let contacts = try self.getAllContacts()
-                let sortedContacts = self.mergeSortByBirthday(contacts)
-                completion(.success(sortedContacts))
-            } catch {
-                completion(.failure(error))
+            // Move to background thread
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let contacts = try self.getAllContacts()
+                    let sortedContacts = self.mergeSortByBirthday(contacts)
+                    DispatchQueue.main.async {
+                        completion(.success(sortedContacts))
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        completion(.failure(error))
+                    }
+                }
             }
         }
     }
@@ -75,31 +82,53 @@ class ContactsManager {
     /// Fetches all contacts from the device
     /// - Returns: Array of Contact structs
     private func getAllContacts() throws -> [Contact] {
+        // Ensure we never enumerate contacts on the main thread
+        if Thread.isMainThread {
+            // Perform the enumeration synchronously on a background queue
+            var result: Result<[Contact], Error> = .success([])
+            let group = DispatchGroup()
+            group.enter()
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let contacts = try self.performContactsEnumeration()
+                    result = .success(contacts)
+                } catch {
+                    result = .failure(error)
+                }
+                group.leave()
+            }
+            group.wait()
+            switch result {
+            case .success(let contacts):
+                return contacts
+            case .failure(let error):
+                throw error
+            }
+        } else {
+            // Already off the main thread – enumerate directly
+            return try self.performContactsEnumeration()
+        }
+    }
+    
+    /// Performs the actual contact enumeration. Must be called off the main thread.
+    private func performContactsEnumeration() throws -> [Contact] {
         let keysToFetch: [CNKeyDescriptor] = [
             CNContactGivenNameKey as CNKeyDescriptor,
             CNContactFamilyNameKey as CNKeyDescriptor,
             CNContactPhoneNumbersKey as CNKeyDescriptor,
             CNContactBirthdayKey as CNKeyDescriptor
         ]
-        
         let request = CNContactFetchRequest(keysToFetch: keysToFetch)
         var contacts: [Contact] = []
-        
         try contactStore.enumerateContacts(with: request) { cnContact, _ in
             let name = "\(cnContact.givenName) \(cnContact.familyName)".trimmingCharacters(in: .whitespaces)
-            
-            // Get first phone number if available
             let phoneNumber = cnContact.phoneNumbers.first?.value.stringValue
-            
-            // Get birthday
             let birthday = cnContact.birthday
-            
             let contact = Contact(name: name.isEmpty ? "No Name" : name,
-                                phoneNumber: phoneNumber,
-                                birthday: birthday)
+                                  phoneNumber: phoneNumber,
+                                  birthday: birthday)
             contacts.append(contact)
         }
-        
         return contacts
     }
     
@@ -221,3 +250,4 @@ extension Date {
         return formatter.string(from: self)
     }
 }
+
