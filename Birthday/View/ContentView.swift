@@ -12,49 +12,95 @@ struct ContentView: View {
 
 @available(iOS 17.0, *)
 struct LandingPage: View {
-    private let manager = ContactsManager()
-    @State var contactsVM = ContactViewModel(contacts: [
-        Contact(name: "Alice", phoneNumber: "123-456-7890", birthday: DateComponents(month: 11, day: 10)),
-        Contact(name: "Bob", phoneNumber: nil, birthday: nil),
-        Contact(name: "Charlie", phoneNumber: "987-654-3210", birthday: DateComponents(month: 12, day: 1))
-    ])
-
+    @State var contactsVM = ContactViewModel()
+    
     var body: some View{
         NavigationStack {
             GeometryReader { geometry in
                 VStack{
-                    HStack{
-                        Text("BirthdayPal").foregroundStyle(.white).font(.title)
+                    // Show loading state
+                    if contactsVM.isLoading {
                         Spacer()
-                    }.padding(.horizontal)
-                    HStack{
-                        Text("Never miss a special day").foregroundStyle(.gray)
+                        ProgressView("Loading contacts...")
+                            .foregroundColor(.white)
+                            .tint(.white)
                         Spacer()
-                    }.padding(.horizontal)
-                    HStack{
-                        Text("Upcoming").foregroundStyle(.white).font(.title3)
+                    } else if let error = contactsVM.errorMessage {
+                        // Show error state
                         Spacer()
-                        Text("\(contactsVM.birthdaysThisMonthCount) this month").foregroundStyle(.white).font(.title3)
-                    }.padding()
-                    ScrollView {
-                        ForEach(contactsVM.contactsWithBirthday) {contact in
-                            NavigationLink(destination: editView()) {
-                                BdayCard(contact: contact, screenwidth: geometry.size.width, screenheight: geometry.size.height)
+                        VStack(spacing: 16) {
+                            Text("Error loading contacts")
+                                .foregroundStyle(.white)
+                                .font(.title3)
+                            Text(error)
+                                .foregroundStyle(.gray)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                            Button("Retry") {
+                                contactsVM.loadContacts()
+                            }
+                            .padding()
+                            .background(Color.white)
+                            .foregroundColor(.black)
+                            .cornerRadius(10)
+                        }
+                        Spacer()
+                    } else {
+                        // Show normal content
+                        HStack{
+                            Text("BirthdayPal").foregroundStyle(.white).font(.title)
+                            Spacer()
+                        }.padding(.horizontal)
+                        HStack{
+                            Text("Never miss a special day").foregroundStyle(.gray)
+                            Spacer()
+                        }.padding(.horizontal)
+                        HStack{
+                            Text("Upcoming").foregroundStyle(.white).font(.title3)
+                            Spacer()
+                            Text("\(contactsVM.birthdaysThisMonthCount) this month").foregroundStyle(.white).font(.title3)
+                        }.padding()
+                        
+                        if contactsVM.contactsWithBirthday.isEmpty {
+                            // Empty state
+                            Spacer()
+                            VStack(spacing: 12) {
+                                Image(systemName: "birthday.cake")
+                                    .font(.system(size: 60))
+                                    .foregroundColor(.gray)
+                                Text("No upcoming birthdays")
+                                    .foregroundStyle(.white)
+                                    .font(.title3)
+                                Text("Add birthdays to your contacts to see them here")
+                                    .foregroundStyle(.gray)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal)
+                            }
+                            Spacer()
+                        } else {
+                            ScrollView {
+                                ForEach(contactsVM.contactsWithBirthday) { contact in
+                                    NavigationLink(destination: editView()) {
+                                        BdayCard(contact: contact, screenwidth: geometry.size.width, screenheight: geometry.size.height)
+                                    }
+                                }
                             }
                         }
+                        
+                        AchievementCardView()
+                        
+                        NavigationLink(destination: BrowseBirthdaysView(contactsVM: contactsVM)) {
+                            browseMonth(screenwidth: geometry.size.width, screenheight: geometry.size.height)
+                        }
                     }
-                    AchievementCardView()
-                    
-                    NavigationLink(destination: BrowseBirthdaysView(contactsVM: contactsVM)) {
-                        browseMonth(screenwidth: geometry.size.width, screenheight: geometry.size.height)
-
-                    }
-                    
                 }.frame(width: geometry.size.width, height: geometry.size.height).background(.black)
             }
         }
+        .onAppear {
+            // Load contacts when view appears
+            contactsVM.loadContacts()
+        }
     }
-    
 }
 
 struct browseMonth: View {
@@ -184,7 +230,8 @@ struct BdayCard: View {
 
 struct editView : View {
     var body: some View {
-        
+        Text("Edit View Coming Soon")
+            .foregroundStyle(.white)
     }
 }
 
@@ -273,6 +320,7 @@ struct ByMonthView: View {
     @Binding var selectedMonth: String
     let months: [String]
     var contactsVM : ContactViewModel
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             // Month dropdown
@@ -300,7 +348,7 @@ struct ByMonthView: View {
                 .padding(.horizontal)
             }
             
-            // Birthday list placeholder
+            // Birthday list
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("\(selectedMonth) Birthdays")
@@ -308,19 +356,71 @@ struct ByMonthView: View {
                         .foregroundColor(.white)
                         .padding(.horizontal)
                     
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color(white: 0.15))
-                        .frame(height: 80)
-                        .overlay(
-                            Text("Birthday cards will appear here")
-                                .foregroundColor(.gray)
-                            
-                        )
-                        .padding(.horizontal)
+                    let monthContacts = contactsVM.contactsPerMonth(monthName: selectedMonth)
+                    
+                    if monthContacts.isEmpty {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color(white: 0.15))
+                            .frame(height: 80)
+                            .overlay(
+                                Text("No birthdays in \(selectedMonth)")
+                                    .foregroundColor(.gray)
+                            )
+                            .padding(.horizontal)
+                    } else {
+                        ForEach(monthContacts) { contact in
+                            ContactRowView(contact: contact)
+                        }
+                    }
                 }
                 .padding(.top, 10)
             }
         }
+    }
+}
+
+// Helper view for displaying contact rows
+@available(iOS 17.0, *)
+struct ContactRowView: View {
+    var contact: Contact
+    
+    var body: some View {
+        RoundedRectangle(cornerRadius: 16)
+            .fill(Color(white: 0.15))
+            .frame(height: 80)
+            .overlay(
+                HStack(alignment: .center) {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(white: 0.25))
+                        .frame(width: 50, height: 50)
+                        .overlay(
+                            VStack {
+                                if let birthday = contact.comparableBirthday {
+                                    Text(birthday.monthAbbrev())
+                                        .font(.caption2)
+                                        .foregroundColor(.gray)
+                                    Text(birthday.day())
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                }
+                            }
+                        )
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(contact.name)
+                            .foregroundColor(.white)
+                            .fontWeight(.semibold)
+                        if let days = contact.daysToBirthday {
+                            Text("In \(days) days")
+                                .foregroundColor(.gray)
+                                .font(.subheadline)
+                        }
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal)
+            )
+            .padding(.horizontal)
     }
 }
 
@@ -329,6 +429,7 @@ struct ByMonthView: View {
 struct CalendarView: View {
     @Binding var selectedDate: Date
     var contactsVM : ContactViewModel
+    
     var body: some View {
         VStack(spacing: 16) {
             // Simple calendar date picker
@@ -339,47 +440,75 @@ struct CalendarView: View {
                 .padding(.horizontal)
                 .colorScheme(.dark)
             
-            // Selected date label
+            // Selected date label and contacts for that date
             VStack(alignment: .leading, spacing: 8) {
                 Text("Selected: \(selectedDate.formattedDate())")
                     .foregroundColor(.gray)
                     .font(.footnote)
                     .padding(.horizontal)
                 
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(white: 0.15))
-                    .frame(height: 80)
-                    .overlay(
-                        VStack(alignment: .leading) {
-                            HStack {
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color(white: 0.25))
-                                    .frame(width: 50, height: 50)
-                                    .overlay(
-                                        VStack {
-                                            Text(selectedDate.monthAbbrev())
-                                                .font(.caption2)
-                                                .foregroundColor(.gray)
-                                            Text(selectedDate.day())
-                                                .font(.headline)
+                let contactsOnDate = contactsVM.contactsWithBirthday.filter { contact in
+                    guard let birthday = contact.comparableBirthday else { return false }
+                    let calendar = Calendar.current
+                    return calendar.isDate(birthday, equalTo: selectedDate, toGranularity: .day) &&
+                           calendar.isDate(birthday, equalTo: selectedDate, toGranularity: .month)
+                }
+                
+                if contactsOnDate.isEmpty {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(white: 0.15))
+                        .frame(height: 80)
+                        .overlay(
+                            Text("No birthdays on this date")
+                                .foregroundColor(.gray)
+                        )
+                        .padding(.horizontal)
+                } else {
+                    ForEach(contactsOnDate) { contact in
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color(white: 0.15))
+                            .frame(height: 80)
+                            .overlay(
+                                VStack(alignment: .leading) {
+                                    HStack {
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(Color(white: 0.25))
+                                            .frame(width: 50, height: 50)
+                                            .overlay(
+                                                VStack {
+                                                    Text(selectedDate.monthAbbrev())
+                                                        .font(.caption2)
+                                                        .foregroundColor(.gray)
+                                                    Text(selectedDate.day())
+                                                        .font(.headline)
+                                                        .foregroundColor(.white)
+                                                }
+                                            )
+                                        
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(contact.name)
                                                 .foregroundColor(.white)
+                                                .fontWeight(.semibold)
+                                            if let days = contact.daysToBirthday {
+                                                if days == 0 {
+                                                    Text("Birthday today!")
+                                                        .foregroundColor(.yellow)
+                                                        .font(.subheadline)
+                                                } else {
+                                                    Text("In \(days) days")
+                                                        .foregroundColor(.gray)
+                                                        .font(.subheadline)
+                                                }
+                                            }
                                         }
-                                    )
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Emily Davis")
-                                        .foregroundColor(.white)
-                                        .fontWeight(.semibold)
-                                    Text("Birthday today!")
-                                        .foregroundColor(.gray)
-                                        .font(.subheadline)
+                                        Spacer()
+                                    }
+                                    .padding(.horizontal)
                                 }
-                                Spacer()
-                            }
+                            )
                             .padding(.horizontal)
-                        }
-                    )
-                    .padding(.horizontal)
+                    }
+                }
             }
         }
     }

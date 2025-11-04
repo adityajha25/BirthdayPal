@@ -1,5 +1,5 @@
 //
-//  File 2.swift
+//  ContactViewModel.swift
 //  BirthdayUI
 //
 //  Created by Jaden Tran on 11/3/25.
@@ -12,9 +12,33 @@ import Combine
 @Observable class ContactViewModel {
     
     var contacts: [Contact]
+    var isLoading: Bool = false
+    var errorMessage: String?
+    
+    private let contactsManager = ContactsManager()
     
     init(contacts: [Contact] = []) {
         self.contacts = contacts
+    }
+    
+    /// Fetches contacts from the device and populates the view model
+    func loadContacts() {
+        isLoading = true
+        errorMessage = nil
+        
+        contactsManager.fetchContactsSortedByBirthday { [weak self] result in
+            DispatchQueue.main.async {
+                self?.isLoading = false
+                
+                switch result {
+                case .success(let fetchedContacts):
+                    self?.contacts = fetchedContacts
+                case .failure(let error):
+                    self?.errorMessage = error.localizedDescription
+                    print("Error fetching contacts: \(error)")
+                }
+            }
+        }
     }
     
     var sortedUpcoming: [Contact] {
@@ -55,7 +79,6 @@ import Combine
         }
     }
     
-    
     func contactsPerMonth(monthName: String) -> [Contact] {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "MMMM"
@@ -71,5 +94,4 @@ import Combine
             return contactMonth == monthNumber
         }
     }
-
 }
