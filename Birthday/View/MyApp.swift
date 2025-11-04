@@ -1,14 +1,15 @@
 //
-//  BirthdayApp.swift
+//  MyApp.swift
 //  Birthday
 //
-//  Created by Aditya Jha    on 10/29/25.
+//  Created by Aditya Jha    on 11/3/25.
 //
 
+import Foundation
 import SwiftUI
 
 @main
-struct BirthdayApp: App {
+struct MyApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()

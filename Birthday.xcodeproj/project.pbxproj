@@ -7,18 +7,13 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		32B301D72EB2DE5F0069DA79 /* Birthday.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = Birthday.app; path = "/Users/jadentran/Desktop/IOS_Bootcamp_Project/build/Debug-iphoneos/Birthday.app"; sourceTree = "<absolute>"; };
+		323AAC052EB80B7500D68DC8 /* Birthday.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Birthday.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		32B301D92EB2DE5F0069DA79 /* Birthday */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Birthday;
-			sourceTree = "<group>";
-		};
-		B80A04022EB5449C00CA24B7 /* UI */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = UI;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -38,7 +33,7 @@
 			isa = PBXGroup;
 			children = (
 				32B301D92EB2DE5F0069DA79 /* Birthday */,
-				B80A04022EB5449C00CA24B7 /* UI */,
+				323AAC052EB80B7500D68DC8 /* Birthday.app */,
 			);
 			sourceTree = "<group>";
 		};
@@ -59,13 +54,12 @@
 			);
 			fileSystemSynchronizedGroups = (
 				32B301D92EB2DE5F0069DA79 /* Birthday */,
-				B80A04022EB5449C00CA24B7 /* UI */,
 			);
 			name = Birthday;
 			packageProductDependencies = (
 			);
 			productName = Birthday;
-			productReference = 32B301D72EB2DE5F0069DA79 /* Birthday.app */;
+			productReference = 323AAC052EB80B7500D68DC8 /* Birthday.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -252,6 +246,7 @@
 				DEVELOPMENT_TEAM = 6RF495LC88;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSContactsUsageDescription = "We need access to your contacts to show upcoming birthdays";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -285,6 +280,7 @@
 				DEVELOPMENT_TEAM = 6RF495LC88;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSContactsUsageDescription = "We need access to your contacts to show upcoming birthdays";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

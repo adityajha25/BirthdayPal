@@ -1,135 +1,109 @@
-import SwiftUI
-import Contacts
+//
+//  ContactViewModel.swift
+//  BirthdayUI
+//
+//  Created by Jaden Tran on 11/3/25.
+//
+
 import Foundation
 import Combine
 
-enum MessageTone: String, CaseIterable, Identifiable {
-    case formal, casual, funny, romantic
-    var id: String { rawValue }
-}
-
-// Takes in tone, name, optional age and returns a message.
-struct MessageTemplates {
-    static func make(tone: MessageTone, name: String, age: Int?) -> String {
-        switch tone {
-        case .formal:
-            return "Happy birthday, \(name). Wishing you a wonderful year ahead."
-        case .casual:
-            if let age {
-                return "Happy birthday, \(name)! You're now \(age). Hope it’s a great one 🎉"
-            } else {
-                return "Happy birthday, \(name)! Hope it’s a great one 🎉"
+@available(iOS 17.0, *)
+@Observable class ContactViewModel {
+    
+    var contacts: [Contact]
+    var isLoading: Bool = false
+    var errorMessage: String?
+    
+    private let contactsManager = ContactsManager()
+    
+    init(contacts: [Contact] = []) {
+        self.contacts = contacts
+    }
+    
+    /// Fetches contacts from the device and populates the view model
+    func loadContacts() {
+        isLoading = true
+        errorMessage = nil
+        
+        contactsManager.fetchContactsSortedByBirthday { [weak self] result in
+            DispatchQueue.main.async {
+                self?.isLoading = false
+                
+                switch result {
+                case .success(let fetchedContacts):
+                    self?.contacts = fetchedContacts
+                case .failure(let error):
+                    self?.errorMessage = error.localizedDescription
+                    print("Error fetching contacts: \(error)")
+                }
             }
-        case .funny:
-            return "HBD \(name)! Another lap around the sun — level \(age ?? 0) unlocked 🥳"
-        case .romantic:
-            return "Happy birthday, \(name) ❤️ So grateful for you—hope today is perfect."
+        }
+    }
+    
+    var sortedUpcoming: [Contact] {
+        contacts.sorted {
+            guard let d1 = $0.comparableBirthday,
+                  let d2 = $1.comparableBirthday else {
+                return $0.comparableBirthday != nil
+            }
+            return d1.nextBirthday() < d2.nextBirthday()
+        }
+    }
+    
+    var contactsWithBirthday: [Contact] {
+        sortedUpcoming.filter { $0.comparableBirthday != nil }
+    }
+    
+    var contactsWithoutBirthday: [Contact] {
+        sortedUpcoming.filter { $0.comparableBirthday == nil }
+    }
+    
+    var birthdaysThisMonthCount: Int {
+        let calendar = Calendar.current
+        let currentMonth = calendar.component(.month, from: Date())
+        
+        return contactsWithBirthday.filter {
+            guard let month = $0.birthday?.month else { return false }
+            return month == currentMonth
+        }.count
+    }
+    
+    var birthdaysThisMonth: [Contact] {
+        let calendar = Calendar.current
+        let currentMonth = calendar.component(.month, from: Date())
+        
+        return contactsWithBirthday.filter {
+            guard let month = $0.birthday?.month else { return false }
+            return month == currentMonth
+        }
+    }
+    
+    func contactsPerDate(date: Date) -> [Contact] {
+        let calendar = Calendar.current
+        let targetMonth = calendar.component(.month, from: date)
+        let targetDay = calendar.component(.day, from: date)
+        
+        return contactsWithBirthday.filter {
+            guard let birthday = $0.birthday else { return false }
+            return birthday.month == targetMonth && birthday.day == targetDay
+        }
+    }
+    
+    func contactsPerMonth(monthName: String) -> [Contact] {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "MMMM"
+        
+        guard let monthDate = dateFormatter.date(from: monthName.capitalized) else {
+            return []
+        }
+
+        let monthNumber = Calendar.current.component(.month, from: monthDate)
+        
+        return contactsWithBirthday.filter {
+            guard let contactMonth = $0.birthday?.month else { return false }
+            return contactMonth == monthNumber
         }
     }
 }
 
-final class BirthdayMessageViewModel: ObservableObject {
-    // contacts whose birthday is today
-    @Published var todaysBirthdayContacts: [CNContact] = []
-
-    // index of the current person
-    @Published private(set) var currentIndex: Int = 0
-
-    // UI flags
-    @Published var showTemplatePicker: Bool = false
-    @Published var showComposer: Bool = false
-
-    // data for composer
-    @Published var composerRecipients: [String] = []
-    @Published var composerBody: String = ""
-
-    // errors
-    @Published var lastError: String?
-
-    // entry point
-    func startBirthdayFlow(with contacts: [CNContact]) {
-        let todays = contacts.filter { Self.isBirthdayToday($0.birthday) }
-
-        guard !todays.isEmpty else {
-            lastError = "No birthdays today 🎂"
-            return
-        }
-
-        todaysBirthdayContacts = todays
-        currentIndex = 0
-        presentTemplateForCurrentContact()
-    }
-
-    private func presentTemplateForCurrentContact() {
-        guard currentIndex < todaysBirthdayContacts.count else {
-            // all done
-            showTemplatePicker = false
-            showComposer = false
-            return
-        }
-        showTemplatePicker = true
-    }
-
-    func userSelectedTemplate(_ tone: MessageTone) {
-        let contact = todaysBirthdayContacts[currentIndex]
-
-        // phone
-        guard let rawPhone = contact.phoneNumbers.first?.value.stringValue else {
-            lastError = "No phone number for \(displayName(for: contact))."
-            advanceToNextContact()
-            return
-        }
-        let phone = rawPhone.filter(\.isNumber)
-        guard !phone.isEmpty else {
-            lastError = "No valid phone for \(displayName(for: contact))."
-            advanceToNextContact()
-            return
-        }
-
-        let name = displayName(for: contact)
-        let age = Self.age(from: contact.birthday)
-
-        composerRecipients = [phone]
-        composerBody = MessageTemplates.make(tone: tone, name: name, age: age)
-
-        showTemplatePicker = false
-        showComposer = true
-    }
-
-    func composerFinished() {
-        showComposer = false
-        advanceToNextContact()
-    }
-
-    private func advanceToNextContact() {
-        currentIndex += 1
-        presentTemplateForCurrentContact()
-    }
-
-    // MARK: helpers
-
-    private func displayName(for contact: CNContact) -> String {
-        if !contact.givenName.isEmpty {
-            return contact.givenName
-        } else if !contact.familyName.isEmpty {
-            return contact.familyName
-        } else {
-            return "there"
-        }
-    }
-
-    private static func isBirthdayToday(_ comps: DateComponents?) -> Bool {
-        guard let comps,
-              let month = comps.month,
-              let day = comps.day else { return false }
-
-        let today = Calendar.current.dateComponents([.month, .day], from: Date())
-        return today.month == month && today.day == day
-    }
-
-    private static func age(from comps: DateComponents?) -> Int? {
-        guard let comps,
-              let dob = Calendar.current.date(from: comps) else { return nil }
-        return Calendar.current.dateComponents([.year], from: dob, to: Date()).year
-    }
-}
