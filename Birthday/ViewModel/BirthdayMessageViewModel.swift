@@ -307,3 +307,4 @@ final class BirthdayMessageViewModel: ObservableObject {
         return Calendar.current.dateComponents([.year], from: dob, to: Date()).year
     }
 }
+

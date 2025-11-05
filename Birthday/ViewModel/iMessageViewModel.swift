@@ -21,7 +21,6 @@ import Combine
         self.contacts = contacts
     }
     
-    /// Fetches contacts from the device and populates the view model
     func loadContacts() {
         isLoading = true
         errorMessage = nil
