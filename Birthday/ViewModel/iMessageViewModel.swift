@@ -7,9 +7,11 @@
 
 import Foundation
 import Combine
+import Contacts
+import ContactsUI
 
 @available(iOS 17.0, *)
-@Observable class ContactViewModel {
+@Observable class ContactViewModel { 
     
     var contacts: [Contact]
     var isLoading: Bool = false
