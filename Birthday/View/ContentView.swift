@@ -128,6 +128,7 @@ struct browseMonth: View {
 }
 
 struct AchievementCardView: View {
+    @StateObject private var messageCounter = MessageCounter()
     var body: some View {
         ZStack {
             // Background card
@@ -151,7 +152,7 @@ struct AchievementCardView: View {
                         .foregroundColor(.gray)
 
                     HStack(alignment: .lastTextBaseline, spacing: 4) {
-                        Text("20")
+                        Text("\(messageCounter.totalMessagesSent)")
                             .font(.system(size: 50, weight: .bold))
                             .foregroundColor(.white)
                         Text("birthdays")
