@@ -111,50 +111,42 @@ struct MessageTemplatePickerView: View {
                                 .cornerRadius(12)
                                 .padding(.horizontal)
                             } else {
-                                WritingToolsTextEditor(text: $generatedMessage)
-                                    .frame(height: 200)
-                                    .padding(12)
-                                    .background(Color(white: 0.15))
-                                    .cornerRadius(12)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Color.blue.opacity(0.3), lineWidth: 1)
-                                    )
-                                    .padding(.horizontal)
+                                WritingToolsTextEditor(
+                                    text: $generatedMessage,
+                                )
+                                .frame(height: 200)
+                                .padding(12)
+                                .background(Color(white: 0.15))
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                                )
+                                .padding(.horizontal)
                             }
                             
-                            // Direct LLM Access Button
+                            // Clear instruction for Writing Tools access with animation
                             if !generatedMessage.isEmpty {
-                                Button(action: {
-                                    // Trigger Writing Tools directly
-                                    triggerWritingTools()
-                                }) {
+                                VStack(spacing: 12) {
                                     HStack(spacing: 8) {
-                                        Image(systemName: "wand.and.stars")
-                                        Text("Refine with Apple Intelligence")
-                                        Image(systemName: "chevron.right")
-                                            .font(.caption)
+                                        Image(systemName: "hand.tap.fill")
+                                            .foregroundColor(.blue)
+                                        Text("Tap the message above to access Apple Writing Tools")
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                            .foregroundColor(.white)
                                     }
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
                                     .padding()
-                                    .background(
-                                        LinearGradient(
-                                            gradient: Gradient(colors: [Color.blue, Color.purple]),
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.blue.opacity(0.2))
                                     .cornerRadius(12)
+                                    
+                                    // Quick tip
+                                    Text("✨ Writing Tools can rewrite, proofread, and refine your message")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
                                 }
                                 .padding(.horizontal)
-                                
-                                Text("💡 Or long-press the text to access Writing Tools manually")
-                                    .font(.caption2)
-                                    .foregroundColor(.gray)
-                                    .padding(.horizontal)
                             }
                         }
                         
@@ -197,24 +189,25 @@ struct MessageTemplatePickerView: View {
         }
     }
     
-    private func triggerWritingTools() {
-        // On iOS 18+, we can programmatically trigger Writing Tools
-        // by simulating the user action through UITextView's menu
-        // The WritingToolsTextEditor should already have writingToolsBehavior = .complete
+    private func formatBirthday(_ birthday: DateComponents?) -> String? {
+        guard let birthday = birthday else { return nil }
         
-        // Show an alert with instructions since we can't fully automate the Writing Tools popup
-        // (Apple doesn't provide a direct API to trigger it programmatically)
-        let alert = UIAlertController(
-            title: "Apple Intelligence",
-            message: "Long-press the message text above, then select 'Writing Tools' → 'Rewrite' to refine your message with Apple Intelligence.",
-            preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: "Got it", style: .default))
+        // Create a date formatter
+        let formatter = DateFormatter()
+        formatter.dateStyle = .long
         
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let viewController = windowScene.windows.first?.rootViewController {
-            viewController.present(alert, animated: true)
+        // If we have a full date
+        if let date = Calendar.current.date(from: birthday) {
+            return "🎂 Birthday: \(formatter.string(from: date))"
         }
+        
+        // If we only have month and day
+        if let month = birthday.month, let day = birthday.day {
+            let monthName = Calendar.current.monthSymbols[month - 1]
+            return "🎂 Birthday: \(monthName) \(day)"
+        }
+        
+        return nil
     }
     
     private func generateMessageWithAI(for contact: CNContact, tone: MessageTone) {
@@ -232,7 +225,7 @@ struct MessageTemplatePickerView: View {
     }
     
     private func generateEnhancedMessage(tone: MessageTone, name: String, age: Int?) -> String {
-        // More varied, personalized templates that feel AI-generated        
+        // More varied, personalized templates that feel AI-generated
         switch tone {
         case .formal:
             let variants = [

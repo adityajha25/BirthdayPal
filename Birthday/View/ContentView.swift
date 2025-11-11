@@ -225,6 +225,7 @@ struct BdayCard: View {
             }.padding(.horizontal)
     }
 }
+
 struct editView: View {
     var contact: Contact
     @StateObject private var messageVM = BirthdayMessageViewModel()
@@ -242,6 +243,21 @@ struct editView: View {
                 Text(contact.name)
                     .font(.headline)
                     .foregroundColor(.gray)
+                
+                // Display Birthday
+                if let birthday = contact.birthday {
+                    VStack(spacing: 8) {
+                        Text("🎂")
+                            .font(.system(size: 40))
+                        Text(formatBirthday(birthday))
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                    }
+                    .padding()
+                    .background(Color(white: 0.15))
+                    .cornerRadius(12)
+                }
                 
                 Spacer()
                 
@@ -306,6 +322,22 @@ struct editView: View {
         }
     }
     
+    private func formatBirthday(_ birthday: DateComponents) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .long
+        
+        if let date = Calendar.current.date(from: birthday) {
+            return formatter.string(from: date)
+        }
+        
+        if let month = birthday.month, let day = birthday.day {
+            let monthName = Calendar.current.monthSymbols[month - 1]
+            return "\(monthName) \(day)"
+        }
+        
+        return "Unknown"
+    }
+    
     private func convertToCNContact(_ contact: Contact) -> CNContact {
         let cnContact = CNMutableContact()
         
@@ -329,6 +361,7 @@ struct editView: View {
         return cnContact.copy() as! CNContact
     }
 }
+
 @available(iOS 17.0, *)
 struct BrowseBirthdaysView: View {
     @State private var selectedMonth = "January"
