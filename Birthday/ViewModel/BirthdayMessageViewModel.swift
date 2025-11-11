@@ -8,150 +8,272 @@ enum MessageTone: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-// Message Template Picker View
+// Streamlined Message Composer View with AI-First Approach
+@available(iOS 18.0, *)
 struct MessageTemplatePickerView: View {
     @ObservedObject var messageVM: BirthdayMessageViewModel
     @Environment(\.dismiss) var dismiss
-    @State private var selectedTone: MessageTone?
-    @State private var editableMessage: String = ""
-    @State private var showEditor: Bool = false
+    @State private var selectedTone: MessageTone = .casual
+    @State private var generatedMessage: String = ""
+    @State private var isGenerating: Bool = false
     
     var body: some View {
         NavigationView {
             ZStack {
                 Color.black.ignoresSafeArea()
                 
-                if !showEditor {
-                    // Template Selection View
-                    VStack(spacing: 20) {
-                        if messageVM.todaysBirthdayContacts.isEmpty {
-                            Text("No contact selected")
+                VStack(spacing: 24) {
+                    if messageVM.todaysBirthdayContacts.isEmpty {
+                        Text("No contact selected")
+                            .foregroundColor(.gray)
+                    } else {
+                        let contact = messageVM.todaysBirthdayContacts[messageVM.currentIndex]
+                        
+                        // Compact Header
+                        VStack(spacing: 12) {
+                            Text("🎉")
+                                .font(.system(size: 50))
+                            Text("Birthday message for \(displayName(for: contact))")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.top, 20)
+                        
+                        // Tone Selector (Horizontal Pills)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Style")
+                                .font(.subheadline)
                                 .foregroundColor(.gray)
-                        } else {
-                            let contact = messageVM.todaysBirthdayContacts[messageVM.currentIndex]
+                                .padding(.horizontal)
                             
-                            // Header
-                            VStack(spacing: 8) {
-                                Text("🎉")
-                                    .font(.system(size: 60))
-                                Text("Send Birthday Message")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                Text("to \(displayName(for: contact))")
-                                    .font(.headline)
-                                    .foregroundColor(.gray)
-                            }
-                            .padding(.top, 40)
-                            
-                            Spacer()
-                            
-                            // Template Options
-                            VStack(spacing: 16) {
-                                Text("Choose a message style:")
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                                
-                                ForEach(MessageTone.allCases) { tone in
-                                    Button(action: {
-                                        selectedTone = tone
-                                        editableMessage = messagePreview(for: tone, contact: contact)
-                                        showEditor = true
-                                    }) {
-                                        VStack(alignment: .leading, spacing: 8) {
-                                            HStack {
-                                                Text(tone.rawValue.capitalized)
-                                                    .font(.headline)
-                                                    .foregroundColor(.white)
-                                                Spacer()
-                                                Image(systemName: "chevron.right")
-                                                    .foregroundColor(.gray)
-                                            }
-                                            
-                                            Text(messagePreview(for: tone, contact: contact))
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 12) {
+                                    ForEach(MessageTone.allCases) { tone in
+                                        Button(action: {
+                                            selectedTone = tone
+                                            generateMessageWithAI(for: contact, tone: tone)
+                                        }) {
+                                            Text(tone.rawValue.capitalized)
                                                 .font(.subheadline)
-                                                .foregroundColor(.gray)
-                                                .lineLimit(2)
+                                                .fontWeight(selectedTone == tone ? .semibold : .regular)
+                                                .foregroundColor(selectedTone == tone ? .black : .white)
+                                                .padding(.horizontal, 20)
+                                                .padding(.vertical, 10)
+                                                .background(selectedTone == tone ? Color.white : Color(white: 0.2))
+                                                .cornerRadius(20)
                                         }
-                                        .padding()
-                                        .frame(maxWidth: .infinity)
-                                        .background(Color(white: 0.15))
-                                        .cornerRadius(12)
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
+                        }
+                        
+                        // AI-Generated Message Editor
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "sparkles")
+                                        .font(.caption)
+                                    Text("AI-Generated Message")
+                                        .font(.subheadline)
+                                }
+                                .foregroundColor(.blue)
+                                
+                                Spacer()
+                                
+                                if !isGenerating && !generatedMessage.isEmpty {
+                                    Button(action: {
+                                        generateMessageWithAI(for: contact, tone: selectedTone)
+                                    }) {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "arrow.clockwise")
+                                            Text("Regenerate")
+                                        }
+                                        .font(.caption)
+                                        .foregroundColor(.blue)
                                     }
                                 }
                             }
                             .padding(.horizontal)
                             
-                            Spacer()
+                            if isGenerating {
+                                VStack(spacing: 16) {
+                                    ProgressView()
+                                        .tint(.white)
+                                    Text("Crafting your message...")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 200)
+                                .background(Color(white: 0.15))
+                                .cornerRadius(12)
+                                .padding(.horizontal)
+                            } else {
+                                WritingToolsTextEditor(
+                                    text: $generatedMessage,
+                                )
+                                .frame(height: 200)
+                                .padding(12)
+                                .background(Color(white: 0.15))
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                                )
+                                .padding(.horizontal)
+                            }
+                            
+                            // Clear instruction for Writing Tools access with animation
+                            if !generatedMessage.isEmpty {
+                                VStack(spacing: 12) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "hand.tap.fill")
+                                            .foregroundColor(.blue)
+                                        Text("Tap the message above to access Apple Writing Tools")
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                            .foregroundColor(.white)
+                                    }
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.blue.opacity(0.2))
+                                    .cornerRadius(12)
+                                    
+                                    // Quick tip
+                                    Text("✨ Writing Tools can rewrite, proofread, and refine your message")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                                .padding(.horizontal)
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        // Action Buttons
+                        VStack(spacing: 12) {
+                            Button(action: {
+                                sendMessage()
+                            }) {
+                                HStack {
+                                    Image(systemName: "paperplane.fill")
+                                    Text("Send Message")
+                                        .fontWeight(.semibold)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(generatedMessage.isEmpty ? Color.gray : Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(12)
+                            }
+                            .disabled(generatedMessage.isEmpty)
+                            .padding(.horizontal)
                             
                             Button("Cancel") {
                                 dismiss()
                             }
                             .foregroundColor(.gray)
-                            .padding(.bottom, 20)
                         }
+                        .padding(.bottom, 20)
                     }
-                } else {
-                    // Message Editor View
-                    VStack(spacing: 20) {
-                        // Header
-                        HStack {
-                            Button("Back") {
-                                showEditor = false
-                            }
-                            .foregroundColor(.blue)
-                            
-                            Spacer()
-                            
-                            Text("Edit Message")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                            
-                            Spacer()
-                            
-                            Button("Send") {
-                                sendEditedMessage()
-                            }
-                            .foregroundColor(.blue)
-                            .bold()
-                        }
-                        .padding()
-                        
-                        // Text Editor
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Preview:")
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                                .padding(.horizontal)
-                            
-                            TextEditor(text: $editableMessage)
-                                .frame(minHeight: 150)
-                                .padding(12)
-                                .background(Color(white: 0.15))
-                                .cornerRadius(12)
-                                .foregroundColor(.white)
-                                .font(.body)
-                                .scrollContentBackground(.hidden)
-                                .padding(.horizontal)
-                        }
-                        
-                        Text("Edit the message before sending")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                        
-                        Spacer()
-                    }
-                    .padding(.top, 20)
                 }
             }
             .navigationBarHidden(true)
+            .onAppear {
+                if let contact = messageVM.todaysBirthdayContacts.first {
+                    generateMessageWithAI(for: contact, tone: selectedTone)
+                }
+            }
         }
     }
     
-    private func sendEditedMessage() {
+    private func formatBirthday(_ birthday: DateComponents?) -> String? {
+        guard let birthday = birthday else { return nil }
+        
+        // Create a date formatter
+        let formatter = DateFormatter()
+        formatter.dateStyle = .long
+        
+        // If we have a full date
+        if let date = Calendar.current.date(from: birthday) {
+            return "🎂 Birthday: \(formatter.string(from: date))"
+        }
+        
+        // If we only have month and day
+        if let month = birthday.month, let day = birthday.day {
+            let monthName = Calendar.current.monthSymbols[month - 1]
+            return "🎂 Birthday: \(monthName) \(day)"
+        }
+        
+        return nil
+    }
+    
+    private func generateMessageWithAI(for contact: CNContact, tone: MessageTone) {
+        isGenerating = true
+        
+        // Simulate AI generation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            let name = displayName(for: contact)
+            let age = calculateAge(from: contact.birthday)
+            
+            // Generate more varied, AI-like messages
+            generatedMessage = generateEnhancedMessage(tone: tone, name: name, age: age)
+            isGenerating = false
+        }
+    }
+    
+    private func generateEnhancedMessage(tone: MessageTone, name: String, age: Int?) -> String {
+        // More varied, personalized templates that feel AI-generated
+        switch tone {
+        case .formal:
+            let variants = [
+                "Wishing you a very happy birthday, \(name). May this year bring you continued success and fulfillment.",
+                "Happy birthday, \(name). I hope this special day marks the beginning of a wonderful year ahead for you.",
+                "Warmest birthday wishes to you, \(name). May you enjoy this day and the year to come."
+            ]
+            return variants.randomElement() ?? variants[0]
+            
+        case .casual:
+            if let age = age {
+                let variants = [
+                    "Happy birthday, \(name)! \(age) looks good on you 🎉 Hope you have an amazing day!",
+                    "Hey \(name)! Happy \(age)th birthday! 🎂 Hope it's filled with good vibes and great memories!",
+                    "Happy birthday! Can't believe you're \(age) already, \(name)! Have the best day 🥳"
+                ]
+                return variants.randomElement() ?? variants[0]
+            } else {
+                let variants = [
+                    "Happy birthday, \(name)! 🎉 Hope your day is as awesome as you are!",
+                    "Wishing you the happiest of birthdays, \(name)! 🎂 Enjoy your special day!",
+                    "Hey \(name)! Happy birthday! 🥳 Hope you have a fantastic celebration!"
+                ]
+                return variants.randomElement() ?? variants[0]
+            }
+            
+        case .funny:
+            let ageNum = age ?? 25
+            let variants = [
+                "Happy birthday, \(name)! You're now level \(ageNum) 🎮 New achievements unlocked! 🥳",
+                "Another year wiser (or just older)! Happy \(ageNum)th birthday, \(name)! 😄🎉",
+                "Congrats on surviving another lap around the sun, \(name)! Level \(ageNum) activated! 🚀🎂"
+            ]
+            return variants.randomElement() ?? variants[0]
+            
+        case .romantic:
+            let variants = [
+                "Happy birthday to my favorite person ❤️ \(name), I'm so grateful for every moment with you. Here's to celebrating you today!",
+                "Happy birthday, \(name) 💕 You make every day brighter. Hope today is as wonderful as you are!",
+                "Wishing the happiest of birthdays to you, \(name) ❤️ So lucky to have you in my life. Let's make today special!"
+            ]
+            return variants.randomElement() ?? variants[0]
+        }
+    }
+    
+    private func sendMessage() {
         guard let contact = messageVM.todaysBirthdayContacts.first else { return }
         
-        // Get phone number
         guard let rawPhone = contact.phoneNumbers.first?.value.stringValue else {
             messageVM.lastError = "No phone number for \(displayName(for: contact))."
             return
@@ -162,9 +284,8 @@ struct MessageTemplatePickerView: View {
             return
         }
         
-        // Set the edited message
         messageVM.composerRecipients = [phone]
-        messageVM.composerBody = editableMessage
+        messageVM.composerBody = generatedMessage
         
         messageVM.showTemplatePicker = false
         messageVM.showComposer = true
@@ -182,18 +303,13 @@ struct MessageTemplatePickerView: View {
         }
     }
     
-    private func messagePreview(for tone: MessageTone, contact: CNContact) -> String {
-        let name = displayName(for: contact)
-        let age = calculateAge(from: contact.birthday)
-        return MessageTemplates.make(tone: tone, name: name, age: age)
-    }
-    
     private func calculateAge(from birthday: DateComponents?) -> Int? {
         guard let birthday = birthday,
               let dob = Calendar.current.date(from: birthday) else { return nil }
         return Calendar.current.dateComponents([.year], from: dob, to: Date()).year
     }
 }
+
 // Takes in tone, name, optional age and returns a message.
 struct MessageTemplates {
     static func make(tone: MessageTone, name: String, age: Int?) -> String {
@@ -213,6 +329,7 @@ struct MessageTemplates {
         }
     }
 }
+
 final class BirthdayMessageViewModel: ObservableObject {
     // contacts for messaging
     @Published var todaysBirthdayContacts: [CNContact] = []
@@ -307,4 +424,3 @@ final class BirthdayMessageViewModel: ObservableObject {
         return Calendar.current.dateComponents([.year], from: dob, to: Date()).year
     }
 }
-
