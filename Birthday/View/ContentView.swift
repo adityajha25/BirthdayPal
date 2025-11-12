@@ -205,11 +205,6 @@ struct AchievementCardView: View {
                             .font(.title3)
                             .foregroundColor(.white)
                     }
-
-                    Text("Very good! 🎉")
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                        .padding(.top, 4)
                 }
                 .padding(16)
 
@@ -543,9 +538,7 @@ struct ByMonthView: View {
                     Text(contact.name)
                         .foregroundColor(.white)
                         .fontWeight(.semibold)
-                    Text("Birthday today!")
-                        .foregroundColor(.gray)
-                        .font(.subheadline)
+                    
                 }
                 Spacer()
             }
@@ -610,9 +603,6 @@ struct CalendarView: View {
                     Text(name)
                         .foregroundColor(.white)
                         .fontWeight(.semibold)
-                    Text("Birthday today!")
-                        .foregroundColor(.gray)
-                        .font(.subheadline)
                 }
                 Spacer()
             }
