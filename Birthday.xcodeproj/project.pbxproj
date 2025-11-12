@@ -6,19 +6,109 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		21EB9CFF2EC4735700D7172A /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 21EB9CFE2EC4735700D7172A /* WidgetKit.framework */; };
+		21EB9D012EC4735700D7172A /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 21EB9D002EC4735700D7172A /* SwiftUI.framework */; };
+		21EB9D122EC4735800D7172A /* BirthdayPalWidget.swiftExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 21EB9CFC2EC4735700D7172A /* BirthdayPalWidget.swiftExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		21EB9D102EC4735800D7172A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 32B301CF2EB2DE5F0069DA79 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 21EB9CFB2EC4735700D7172A;
+			remoteInfo = BirthdayPalWidget.swiftExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		21EB9D172EC4735800D7172A /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				21EB9D122EC4735800D7172A /* BirthdayPalWidget.swiftExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		21EB9CFC2EC4735700D7172A /* BirthdayPalWidget.swiftExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BirthdayPalWidget.swiftExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		21EB9CFE2EC4735700D7172A /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		21EB9D002EC4735700D7172A /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		21EB9D1B2EC4753D00D7172A /* BirthdayPalWidget.swiftExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BirthdayPalWidget.swiftExtension.entitlements; sourceTree = "<group>"; };
 		323AAC052EB80B7500D68DC8 /* Birthday.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Birthday.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		21EB9D2B2EC47A4B00D7172A /* Exceptions for "Birthday" folder in "BirthdayPalWidget.swiftExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Model/BirthdayWidgetData.swift,
+			);
+			target = 21EB9CFB2EC4735700D7172A /* BirthdayPalWidget.swiftExtension */;
+		};
+		21EB9D3E2EC4865D00D7172A /* Exceptions for "BirthdayPalWidget.swift" folder in "Birthday" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				AppIntent.swift,
+				Assets.xcassets,
+				BirthdayPalWidget_swift.swift,
+				BirthdayPalWidget_swiftBundle.swift,
+				BirthdayPalWidget_swiftControl.swift,
+				BirthdayPalWidget_swiftLiveActivity.swift,
+				Info.plist,
+			);
+			target = 32B301D62EB2DE5F0069DA79 /* Birthday */;
+		};
+		21EB9D3F2EC4865D00D7172A /* Exceptions for "BirthdayPalWidget.swift" folder in "BirthdayPalWidget.swiftExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				AppIntent.swift,
+				Assets.xcassets,
+				BirthdayPalWidget_swift.swift,
+				BirthdayPalWidget_swiftBundle.swift,
+				BirthdayPalWidget_swiftControl.swift,
+				BirthdayPalWidget_swiftLiveActivity.swift,
+			);
+			target = 21EB9CFB2EC4735700D7172A /* BirthdayPalWidget.swiftExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		21EB9D372EC4865D00D7172A /* BirthdayPalWidget.swift */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				21EB9D3E2EC4865D00D7172A /* Exceptions for "BirthdayPalWidget.swift" folder in "Birthday" target */,
+				21EB9D3F2EC4865D00D7172A /* Exceptions for "BirthdayPalWidget.swift" folder in "BirthdayPalWidget.swiftExtension" target */,
+			);
+			path = BirthdayPalWidget.swift;
+			sourceTree = "<group>";
+		};
 		32B301D92EB2DE5F0069DA79 /* Birthday */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				21EB9D2B2EC47A4B00D7172A /* Exceptions for "Birthday" folder in "BirthdayPalWidget.swiftExtension" target */,
+			);
 			path = Birthday;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		21EB9CF92EC4735700D7172A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				21EB9D012EC4735700D7172A /* SwiftUI.framework in Frameworks */,
+				21EB9CFF2EC4735700D7172A /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		32B301D42EB2DE5F0069DA79 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -29,17 +119,49 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		21EB9CFD2EC4735700D7172A /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				21EB9CFE2EC4735700D7172A /* WidgetKit.framework */,
+				21EB9D002EC4735700D7172A /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		32B301CE2EB2DE5F0069DA79 = {
 			isa = PBXGroup;
 			children = (
+				21EB9D1B2EC4753D00D7172A /* BirthdayPalWidget.swiftExtension.entitlements */,
 				32B301D92EB2DE5F0069DA79 /* Birthday */,
 				323AAC052EB80B7500D68DC8 /* Birthday.app */,
+				21EB9D372EC4865D00D7172A /* BirthdayPalWidget.swift */,
+				21EB9CFC2EC4735700D7172A /* BirthdayPalWidget.swiftExtension.appex */,
+				21EB9CFD2EC4735700D7172A /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		21EB9CFB2EC4735700D7172A /* BirthdayPalWidget.swiftExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 21EB9D142EC4735800D7172A /* Build configuration list for PBXNativeTarget "BirthdayPalWidget.swiftExtension" */;
+			buildPhases = (
+				21EB9CF82EC4735700D7172A /* Sources */,
+				21EB9CF92EC4735700D7172A /* Frameworks */,
+				21EB9CFA2EC4735700D7172A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BirthdayPalWidget.swiftExtension;
+			packageProductDependencies = (
+			);
+			productName = BirthdayPalWidget.swiftExtension;
+			productReference = 21EB9CFC2EC4735700D7172A /* BirthdayPalWidget.swiftExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		32B301D62EB2DE5F0069DA79 /* Birthday */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 32B301E22EB2DE610069DA79 /* Build configuration list for PBXNativeTarget "Birthday" */;
@@ -47,12 +169,15 @@
 				32B301D32EB2DE5F0069DA79 /* Sources */,
 				32B301D42EB2DE5F0069DA79 /* Frameworks */,
 				32B301D52EB2DE5F0069DA79 /* Resources */,
+				21EB9D172EC4735800D7172A /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				21EB9D112EC4735800D7172A /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
+				21EB9D372EC4865D00D7172A /* BirthdayPalWidget.swift */,
 				32B301D92EB2DE5F0069DA79 /* Birthday */,
 			);
 			name = Birthday;
@@ -72,6 +197,9 @@
 				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
+					21EB9CFB2EC4735700D7172A = {
+						CreatedOnToolsVersion = 26.0;
+					};
 					32B301D62EB2DE5F0069DA79 = {
 						CreatedOnToolsVersion = 26.0;
 					};
@@ -92,11 +220,19 @@
 			projectRoot = "";
 			targets = (
 				32B301D62EB2DE5F0069DA79 /* Birthday */,
+				21EB9CFB2EC4735700D7172A /* BirthdayPalWidget.swiftExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		21EB9CFA2EC4735700D7172A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		32B301D52EB2DE5F0069DA79 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -107,6 +243,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		21EB9CF82EC4735700D7172A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		32B301D32EB2DE5F0069DA79 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -116,7 +259,79 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		21EB9D112EC4735800D7172A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 21EB9CFB2EC4735700D7172A /* BirthdayPalWidget.swiftExtension */;
+			targetProxy = 21EB9D102EC4735800D7172A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		21EB9D152EC4735800D7172A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = BirthdayPalWidget.swiftExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6RF495LC88;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BirthdayPalWidget.swift/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BirthdayPalWidget.swift;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "IOSAppClub.Birthday.BirthdayPalWidget-swift";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		21EB9D162EC4735800D7172A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = BirthdayPalWidget.swiftExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6RF495LC88;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BirthdayPalWidget.swift/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BirthdayPalWidget.swift;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "IOSAppClub.Birthday.BirthdayPalWidget-swift";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		32B301E02EB2DE610069DA79 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -241,6 +456,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Birthday/Birthday.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 6RF495LC88;
@@ -275,6 +491,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Birthday/Birthday.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 6RF495LC88;
@@ -307,6 +524,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		21EB9D142EC4735800D7172A /* Build configuration list for PBXNativeTarget "BirthdayPalWidget.swiftExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				21EB9D152EC4735800D7172A /* Debug */,
+				21EB9D162EC4735800D7172A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		32B301D22EB2DE5F0069DA79 /* Build configuration list for PBXProject "Birthday" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

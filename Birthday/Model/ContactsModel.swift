@@ -6,6 +6,7 @@
 //
 import Foundation
 import Contacts
+import Combine
 
 /// Represents a contact with essential information
 struct Contact: Identifiable {

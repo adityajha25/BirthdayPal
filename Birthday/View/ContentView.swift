@@ -8,32 +8,47 @@ struct ContentView: View {
             LandingPage()
         } else {
             // Fallback on earlier versions
+            Text("Requires iOS 17 or later")
         }
     }
 }
 
 @available(iOS 17.0, *)
 struct LandingPage: View {
-    @State var contactsVM = ContactViewModel()
+    @StateObject private var contactsVM = ContactViewModel()
 
-    var body: some View{
+    var body: some View {
         NavigationStack {
             GeometryReader { geometry in
-                VStack{
-                    HStack{
-                        Text("BirthdayPal").foregroundStyle(.white).font(.title)
+                VStack {
+                    // Header
+                    HStack {
+                        Text("BirthdayPal")
+                            .foregroundStyle(.white)
+                            .font(.title)
                         Spacer()
-                    }.padding(.horizontal)
-                    HStack{
-                        Text("Never miss a special day").foregroundStyle(.gray)
+                    }
+                    .padding(.horizontal)
+
+                    HStack {
+                        Text("Never miss a special day")
+                            .foregroundStyle(.gray)
                         Spacer()
-                    }.padding(.horizontal)
-                    HStack{
-                        Text("Upcoming").foregroundStyle(.white).font(.title3)
+                    }
+                    .padding(.horizontal)
+
+                    HStack {
+                        Text("Upcoming")
+                            .foregroundStyle(.white)
+                            .font(.title3)
                         Spacer()
-                        Text("\(contactsVM.birthdaysThisMonthCount) this month").foregroundStyle(.white).font(.title3)
-                    }.padding()
-                    
+                        Text("\(contactsVM.birthdaysThisMonthCount) this month")
+                            .foregroundStyle(.white)
+                            .font(.title3)
+                    }
+                    .padding()
+
+                    // Main content
                     if contactsVM.isLoading {
                         Spacer()
                         ProgressView("Loading contacts...")
@@ -76,21 +91,36 @@ struct LandingPage: View {
                         Spacer()
                     } else {
                         ScrollView {
-                            ForEach(contactsVM.contactsWithBirthday) {contact in
-                                NavigationLink(destination: editView(contact: contact)) {
-                                    BdayCard(contact: contact, screenwidth: geometry.size.width, screenheight: geometry.size.height)
+                            ForEach(contactsVM.contactsWithBirthday) { contact in
+                                NavigationLink(
+                                    destination: editView(
+                                        contact: contact,
+                                        contactsVM: contactsVM  // 👈 pass view model down
+                                    )
+                                ) {
+                                    BdayCard(
+                                        contact: contact,
+                                        screenwidth: geometry.size.width,
+                                        screenheight: geometry.size.height
+                                    )
                                 }
                             }
                         }
                     }
-                    
-                    AchievementCardView(upcomingCount: contactsVM.contactsWithBirthday.count)
-                    
+
+                    // Achievement card – now using rememberedBirthdaysCount
+                    AchievementCardView(rememberedCount: contactsVM.rememberedBirthdaysCount)
+
+                    // Browse by month nav
                     NavigationLink(destination: BrowseBirthdaysView(contactsVM: contactsVM)) {
-                        browseMonth(screenwidth: geometry.size.width, screenheight: geometry.size.height)
+                        browseMonth(
+                            screenwidth: geometry.size.width,
+                            screenheight: geometry.size.height
+                        )
                     }
-                    
-                }.frame(width: geometry.size.width, height: geometry.size.height).background(.black)
+                }
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .background(Color.black)
             }
         }
         .onAppear {
@@ -99,35 +129,53 @@ struct LandingPage: View {
     }
 }
 
+// MARK: - Browse Month Card
+
 struct browseMonth: View {
     var screenwidth: CGFloat
     var screenheight: CGFloat
+
     var body: some View {
-        ZStack(alignment:.topLeading ) {
-            RoundedRectangle(cornerRadius: 20).fill(Color(red: 0.1, green: 0.1, blue: 0.1)).frame(height: screenheight * 0.14)
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(red: 0.1, green: 0.1, blue: 0.1))
+                .frame(height: screenheight * 0.14)
+
             HStack {
                 ZStack {
-                    if #available(iOS 17.0, *) {
-                        RoundedRectangle(cornerRadius: 10).fill(.gray).frame(width: screenwidth * 0.2, height: screenwidth * 0.2)
-                    } else {
-                        // Fallback on earlier versions
-                    }
-                    Image(systemName: "calendar").resizable().frame(width: screenwidth * 0.1, height: screenheight * 0.05).foregroundColor(.black)
-                }.padding()
-                VStack {
-                    Text("Browse by Month").foregroundStyle(.white)
-                    Text("View all birthdays").foregroundStyle(.gray)
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.gray)
+                        .frame(width: screenwidth * 0.2, height: screenwidth * 0.2)
+
+                    Image(systemName: "calendar")
+                        .resizable()
+                        .frame(width: screenwidth * 0.1, height: screenheight * 0.05)
+                        .foregroundColor(.black)
                 }
+                .padding()
+
+                VStack(alignment: .leading) {
+                    Text("Browse by Month")
+                        .foregroundStyle(.white)
+                    Text("View all birthdays")
+                        .foregroundStyle(.gray)
+                }
+
                 Spacer()
-                Image(systemName: "chevron.right").foregroundColor(.gray).padding()
+
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.gray)
+                    .padding()
             }
-            
-        }.padding(.horizontal)
+        }
+        .padding(.horizontal)
     }
 }
 
+// MARK: - Achievement Card
+
 struct AchievementCardView: View {
-    let upcomingCount: Int
+    let rememberedCount: Int
 
     var body: some View {
         ZStack {
@@ -150,7 +198,7 @@ struct AchievementCardView: View {
                         .foregroundColor(.gray)
 
                     HStack(alignment: .lastTextBaseline, spacing: 4) {
-                        Text("\(upcomingCount)")
+                        Text("\(rememberedCount)")
                             .font(.system(size: 50, weight: .bold))
                             .foregroundColor(.white)
                         Text("birthdays")
@@ -178,69 +226,82 @@ struct AchievementCardView: View {
     }
 }
 
+// MARK: - Birthday Card
 
 struct BdayCard: View {
-    var contact : Contact
-    var screenwidth : CGFloat
+    var contact: Contact
+    var screenwidth: CGFloat
     var screenheight: CGFloat
+
     var body: some View {
-            ZStack(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color(red: 0.1, green: 0.1, blue: 0.1))
-                    .frame(height: screenheight * 0.16)
-                HStack(alignment: .top) {
-                    ZStack {
-                        if #available(iOS 17.0, *) {
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(.clear)
-                                .stroke(.white)
-                                .frame(width: screenwidth * 0.125, height: screenwidth * 0.125)
-                        } else {
-                            // Fallback on earlier versions
-                        }
-                        VStack {
-                            Text("\(contact.comparableBirthday!.formattedMonthDay().split(separator: " ")[0])")
-                                .foregroundStyle(.white)
-                                .padding(.top, 1)
-                            Text("\(contact.comparableBirthday!.formattedMonthDay().split(separator: " ")[1])")
-                                .foregroundStyle(.white)
-                                .padding(.bottom, 1)
-                        }
-                    }.frame(width: screenwidth * 0.15, height: screenwidth * 0.15)
-                        .padding(.trailing, 4)
-                    VStack(alignment: .leading) {
-                        Text(contact.name)
-                            .bold()
-                            .font(.system(size: 25))
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(red: 0.1, green: 0.1, blue: 0.1))
+                .frame(height: screenheight * 0.16)
+
+            HStack(alignment: .top) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.clear)
+                        .stroke(Color.white)
+                        .frame(width: screenwidth * 0.125, height: screenwidth * 0.125)
+
+                    VStack {
+                        let parts = contact.comparableBirthday!.formattedMonthDay().split(separator: " ")
+                        Text(String(parts[0]))
                             .foregroundStyle(.white)
-                        Text("In \(contact.daysToBirthday!) days").foregroundStyle(.white)
+                            .padding(.top, 1)
+                        Text(String(parts[1]))
+                            .foregroundStyle(.white)
+                            .padding(.bottom, 1)
                     }
-                    Spacer()
                 }
-                }.padding(10)
-            }.padding(.horizontal)
+                .frame(width: screenwidth * 0.15, height: screenwidth * 0.15)
+                .padding(.trailing, 4)
+
+                VStack(alignment: .leading) {
+                    Text(contact.name)
+                        .bold()
+                        .font(.system(size: 25))
+                        .foregroundStyle(.white)
+                    if let days = contact.daysToBirthday {
+                        Text("In \(days) days")
+                            .foregroundStyle(.white)
+                    }
+                }
+
+                Spacer()
+            }
+            .padding(10)
+        }
+        .padding(.horizontal)
     }
 }
+
+// MARK: - Edit View
+
 struct editView: View {
     var contact: Contact
+    var contactsVM: ContactViewModel          // 👈 get the shared view model
+
     @StateObject private var messageVM = BirthdayMessageViewModel()
     @Environment(\.dismiss) var dismiss
-    
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            
+
             VStack(spacing: 20) {
                 Text("Send Birthday Message")
                     .font(.title)
                     .foregroundColor(.white)
-                
+
                 Text(contact.name)
                     .font(.headline)
                     .foregroundColor(.gray)
-                
+
                 Spacer()
-                
+
                 Button(action: {
                     let cnContact = convertToCNContact(contact)
                     messageVM.startBirthdayFlow(with: [cnContact])
@@ -256,7 +317,7 @@ struct editView: View {
                     .cornerRadius(12)
                 }
                 .padding(.horizontal)
-                
+
                 Spacer()
             }
         }
@@ -268,7 +329,11 @@ struct editView: View {
                 MessageComposerView(
                     recipients: messageVM.composerRecipients,
                     body: messageVM.composerBody,
-                    onFinish: { _ in
+                    onFinish: { result in
+                        // 👇 only count when the message was actually sent
+                        if result == .sent {
+                            contactsVM.incrementRememberedBirthdays()
+                        }
                         messageVM.composerFinished()
                         dismiss()
                     }
@@ -301,10 +366,10 @@ struct editView: View {
             }
         }
     }
-    
+
     private func convertToCNContact(_ contact: Contact) -> CNContact {
         let cnContact = CNMutableContact()
-        
+
         let nameComponents = contact.name.components(separatedBy: " ")
         if nameComponents.count > 0 {
             cnContact.givenName = nameComponents[0]
@@ -312,42 +377,47 @@ struct editView: View {
         if nameComponents.count > 1 {
             cnContact.familyName = nameComponents[1...].joined(separator: " ")
         }
-        
+
         if let phoneNumber = contact.phoneNumber {
-            let phone = CNLabeledValue(label: CNLabelPhoneNumberMain, value: CNPhoneNumber(stringValue: phoneNumber))
+            let phone = CNLabeledValue(
+                label: CNLabelPhoneNumberMain,
+                value: CNPhoneNumber(stringValue: phoneNumber)
+            )
             cnContact.phoneNumbers = [phone]
         }
-        
+
         if let birthday = contact.birthday {
             cnContact.birthday = birthday
         }
-        
+
         return cnContact.copy() as! CNContact
     }
 }
+
+// MARK: - BrowseBirthdaysView and subviews
+
 @available(iOS 17.0, *)
 struct BrowseBirthdaysView: View {
     @State private var selectedMonth = "January"
     @State private var selectedTab: ViewMode = .byMonth
     @State private var selectedDate = Date()
-    var contactsVM : ContactViewModel
-    
+    var contactsVM: ContactViewModel
+
     enum ViewMode {
         case byMonth
         case calendar
     }
-    
+
     let months = [
         "January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December"
     ]
-    
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            
+
             VStack(alignment: .leading, spacing: 20) {
-                
                 // Header
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
@@ -364,8 +434,8 @@ struct BrowseBirthdaysView: View {
                     .padding(.horizontal)
                     .padding(.top, 20)
                 }
-                
-                // Toggle between By Month / Calendar
+
+                // Toggle
                 HStack(spacing: 8) {
                     Button(action: { selectedTab = .byMonth }) {
                         Text("By Month")
@@ -377,7 +447,7 @@ struct BrowseBirthdaysView: View {
                             .background(selectedTab == .byMonth ? Color.white : Color(white: 0.15))
                             .cornerRadius(12)
                     }
-                    
+
                     Button(action: { selectedTab = .calendar }) {
                         Text("Calendar")
                             .font(.subheadline)
@@ -390,14 +460,13 @@ struct BrowseBirthdaysView: View {
                     }
                 }
                 .padding(.horizontal)
-                
-                // Conditional content
+
                 if selectedTab == .byMonth {
                     ByMonthView(selectedMonth: $selectedMonth, months: months, contactsVM: contactsVM)
                 } else {
                     CalendarView(selectedDate: $selectedDate, contactsVM: contactsVM)
                 }
-                
+
                 Spacer()
             }
         }
@@ -408,7 +477,8 @@ struct BrowseBirthdaysView: View {
 struct ByMonthView: View {
     @Binding var selectedMonth: String
     let months: [String]
-    var contactsVM : ContactViewModel
+    var contactsVM: ContactViewModel
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             // Month dropdown
@@ -417,7 +487,7 @@ struct ByMonthView: View {
                     .font(.footnote)
                     .foregroundColor(.gray)
                     .padding(.horizontal)
-                
+
                 HStack {
                     Picker("Select Month", selection: $selectedMonth) {
                         ForEach(months, id: \.self) { month in
@@ -430,32 +500,30 @@ struct ByMonthView: View {
                     .background(Color(white: 0.15))
                     .cornerRadius(10)
                     .frame(width: 160)
-                    
+
                     Spacer()
                 }
                 .padding(.horizontal)
             }
-            
-            // Birthday list placeholder
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("\(selectedMonth) Birthdays")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .padding(.horizontal)
-                    
-                    ScrollView {
-                        ForEach(contactsVM.contactsPerMonth(monthName: selectedMonth)) { contact in
-                            monthCard(contact: contact)
-                        }
+
+            VStack(alignment: .leading, spacing: 16) {
+                Text("\(selectedMonth) Birthdays")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .padding(.horizontal)
+
+                ScrollView {
+                    ForEach(contactsVM.contactsPerMonth(monthName: selectedMonth)) { contact in
+                        monthCard(contact: contact)
                     }
                 }
-                .padding(.top, 10)
-            
+            }
+            .padding(.top, 10)
         }
     }
-    
-    func monthCard(contact : Contact) -> some View {
-        return VStack(alignment: .leading) {
+
+    func monthCard(contact: Contact) -> some View {
+        VStack(alignment: .leading) {
             HStack {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(Color(white: 0.25))
@@ -470,7 +538,7 @@ struct ByMonthView: View {
                                 .foregroundColor(.white)
                         }
                     )
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text(contact.name)
                         .foregroundColor(.white)
@@ -483,32 +551,31 @@ struct ByMonthView: View {
             }
             .padding(.horizontal)
         }
-
     }
 }
 
 // MARK: - Calendar View
+
 @available(iOS 17.0, *)
 struct CalendarView: View {
     @Binding var selectedDate: Date
-    var contactsVM : ContactViewModel
+    var contactsVM: ContactViewModel
+
     var body: some View {
         VStack(spacing: 16) {
-            // Simple calendar date picker
             DatePicker("", selection: $selectedDate, displayedComponents: .date)
                 .datePickerStyle(GraphicalDatePickerStyle())
                 .background(Color(white: 0.15))
                 .cornerRadius(16)
                 .padding(.horizontal)
                 .colorScheme(.dark)
-            
-            // Selected date label
+
             VStack(alignment: .leading, spacing: 8) {
                 Text("Selected: \(selectedDate.formattedDate())")
                     .foregroundColor(.gray)
                     .font(.footnote)
                     .padding(.horizontal)
-                
+
                 RoundedRectangle(cornerRadius: 16)
                     .fill(Color(white: 0.15))
                     .frame(height: 80)
@@ -521,9 +588,9 @@ struct CalendarView: View {
             }
         }
     }
-    
+
     func calendarCard(name: String) -> some View {
-        return VStack(alignment: .leading) {
+        VStack(alignment: .leading) {
             HStack {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(Color(white: 0.25))
@@ -538,7 +605,7 @@ struct CalendarView: View {
                                 .foregroundColor(.white)
                         }
                     )
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text(name)
                         .foregroundColor(.white)
