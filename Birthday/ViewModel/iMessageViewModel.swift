@@ -100,25 +100,7 @@ final class ContactViewModel: ObservableObject {
 
     /// Number of *upcoming* birthdays that still happen in the current month.
     var birthdaysThisMonthCount: Int {
-        let calendar = Calendar.current
-        let now = Date()
-
-        let currentComponents = calendar.dateComponents([.month, .year], from: now)
-
-        return contactsWithBirthday.filter { contact in
-            // daysToBirthday = days from *today* to their next birthday
-            guard let days = contact.daysToBirthday,
-                  let nextBirthdayDate = calendar.date(byAdding: .day, value: days, to: now)
-            else {
-                return false
-            }
-
-            let nextComponents = calendar.dateComponents([.month, .year], from: nextBirthdayDate)
-
-            // Only count if the *next* birthday lands in this month & year
-            return nextComponents.month == currentComponents.month &&
-                   nextComponents.year == currentComponents.year
-        }.count
+        birthdaysThisMonth.count
     }
 
     /// The actual contacts whose *next* birthday is still in this month.

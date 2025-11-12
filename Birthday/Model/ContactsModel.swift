@@ -34,7 +34,8 @@ struct Contact: Identifiable {
     var daysToBirthday: Int? {
         guard let nextBirthdayDate = comparableBirthday?.nextBirthday() else { return nil }
         let calendar = Calendar.current
-        let days = calendar.dateComponents([.day], from: Date(), to: nextBirthdayDate).day
+        let today = calendar.startOfDay(for: Date())
+        let days = calendar.dateComponents([.day], from: today, to: nextBirthdayDate).day
         return days
     }
 }
@@ -227,10 +228,12 @@ extension Date {
     }
     
     func nextBirthday() -> Date {
-        let today = Date()
-        return self < today
-            ? Calendar.current.date(byAdding: .year, value: 1, to: self)!
-            : self
+        let today = Calendar.current.startOfDay(for: Date())
+        let birthdayDay = Calendar.current.startOfDay(for: self)
+        
+        return birthdayDay < today
+            ? Calendar.current.date(byAdding: .year, value: 1, to: birthdayDay)!
+            : birthdayDay
     }
     
     func formattedDate() -> String {

@@ -95,7 +95,7 @@ struct LandingPage: View {
                                 NavigationLink(
                                     destination: editView(
                                         contact: contact,
-                                        contactsVM: contactsVM  // 👈 pass view model down
+                                        contactsVM: contactsVM  // pass view model down
                                     )
                                 ) {
                                     BdayCard(
