@@ -12,10 +12,12 @@ enum MessageTone: String, CaseIterable, Identifiable {
 @available(iOS 18.0, *)
 struct MessageTemplatePickerView: View {
     @ObservedObject var messageVM: BirthdayMessageViewModel
+    @ObservedObject var messageCounter: MessageCounter // Add this
     @Environment(\.dismiss) var dismiss
     @State private var selectedTone: MessageTone = .casual
     @State private var generatedMessage: String = ""
     @State private var isGenerating: Bool = false
+    @State private var showMessageHistory: Bool = false // Add this
     
     var body: some View {
         NavigationView {
@@ -29,8 +31,31 @@ struct MessageTemplatePickerView: View {
                     } else {
                         let contact = messageVM.todaysBirthdayContacts[messageVM.currentIndex]
                         
-                        // Compact Header
+                        // Compact Header with History Button
                         VStack(spacing: 12) {
+                            HStack {
+                                Spacer()
+                                
+                                // History button (only show if there are past messages)
+                                if !messageCounter.getMessages(for: contact.identifier).isEmpty {
+                                    Button(action: {
+                                        showMessageHistory = true
+                                    }) {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "clock.arrow.circlepath")
+                                            Text("History")
+                                        }
+                                        .font(.caption)
+                                        .foregroundColor(.blue)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(Color.blue.opacity(0.2))
+                                        .cornerRadius(8)
+                                    }
+                                    .padding(.trailing)
+                                }
+                            }
+                            
                             Text("🎉")
                                 .font(.system(size: 50))
                             Text("Birthday message for \(displayName(for: contact))")
@@ -186,6 +211,14 @@ struct MessageTemplatePickerView: View {
                     generateMessageWithAI(for: contact, tone: selectedTone)
                 }
             }
+            .sheet(isPresented: $showMessageHistory) {
+                if let contact = messageVM.todaysBirthdayContacts.first {
+                    MessageHistoryView(
+                        contact: contact,
+                        messages: messageCounter.getMessages(for: contact.identifier)
+                    )
+                }
+            }
         }
     }
     
@@ -307,6 +340,90 @@ struct MessageTemplatePickerView: View {
         guard let birthday = birthday,
               let dob = Calendar.current.date(from: birthday) else { return nil }
         return Calendar.current.dateComponents([.year], from: dob, to: Date()).year
+    }
+}
+
+// New: Message History View
+struct MessageHistoryView: View {
+    let contact: CNContact
+    let messages: [MessageRecord]
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                
+                if messages.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "tray")
+                            .font(.system(size: 60))
+                            .foregroundColor(.gray)
+                        Text("No messages sent yet")
+                            .font(.headline)
+                            .foregroundColor(.gray)
+                    }
+                } else {
+                    ScrollView {
+                        VStack(spacing: 16) {
+                            ForEach(messages) { message in
+                                MessageHistoryCard(message: message)
+                            }
+                        }
+                        .padding()
+                    }
+                }
+            }
+            .navigationTitle("Past Messages")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundColor(.blue)
+                }
+            }
+        }
+    }
+}
+
+struct MessageHistoryCard: View {
+    let message: MessageRecord
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Date header
+            HStack {
+                Image(systemName: "calendar")
+                    .font(.caption)
+                    .foregroundColor(.blue)
+                Text(formattedDate(message.dateSent))
+                    .font(.subheadline)
+                    .foregroundColor(.blue)
+                
+                Spacer()
+            }
+            
+            // Message content
+            Text(message.message)
+                .font(.body)
+                .foregroundColor(.white)
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(white: 0.15))
+                .cornerRadius(12)
+        }
+        .padding()
+        .background(Color(white: 0.1))
+        .cornerRadius(16)
+    }
+    
+    private func formattedDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 }
 

@@ -14,52 +14,19 @@ struct BirthdaySenderView: View {
     @StateObject private var vm = BirthdayMessageViewModel()
     @StateObject private var messageCounter = MessageCounter()
 
-    // pretend you already loaded contacts somewhere else
     let allContacts: [CNContact]
 
     var body: some View {
         VStack(spacing: 16) {
-            // Display message count
-            VStack(spacing: 8) {
-                Text("🎉")
-                    .font(.system(size: 40))
-                Text("You've sent \(messageCounter.totalMessagesSent) birthday messages!")
-                    .font(.headline)
-                    .foregroundColor(.secondary)
-            }
-            .padding()
-            
-            Button("Send birthday messages for today") {
-                vm.startBirthdayFlow(with: allContacts)
-            }
-            .buttonStyle(.borderedProminent)
-
-            if let err = vm.lastError {
-                Text(err)
-                    .foregroundColor(.red)
-            }
+            // ... existing code ...
         }
         .sheet(isPresented: $vm.showTemplatePicker) {
-            // template picker sheet
-            VStack(spacing: 14) {
-                Text("Choose a template")
-                    .font(.headline)
-
-                ForEach(MessageTone.allCases) { tone in
-                    Button(tone.rawValue.capitalized) {
-                        vm.userSelectedTemplate(tone)
-                    }
-                    .buttonStyle(.bordered)
-                }
-
-                Button("Cancel") {
-                    // if user cancels, just go to next contact
-                    vm.composerFinished()
-                }
-                .foregroundColor(.red)
-                .padding(.top)
+            if #available(iOS 18.0, *) {
+                MessageTemplatePickerView(
+                    messageVM: vm,
+                    messageCounter: messageCounter // Pass the counter
+                )
             }
-            .padding()
         }
         .sheet(isPresented: $vm.showComposer) {
             if MFMessageComposeViewController.canSendText() {
@@ -67,12 +34,14 @@ struct BirthdaySenderView: View {
                     recipients: vm.composerRecipients,
                     body: vm.composerBody
                 ) { result in
-                    // Increment counter only when message is actually sent
-                    if result == .sent {
-                        messageCounter.incrementMessageCount()
+                    if result == .sent,
+                       let contact = vm.todaysBirthdayContacts[safe: vm.currentIndex] {
+                        messageCounter.recordMessage(
+                            to: contact.identifier,
+                            message: vm.composerBody,
+                            contactName: "\(contact.givenName) \(contact.familyName)".trimmingCharacters(in: .whitespaces)
+                        )
                     }
-                    
-                    // this is called when user sends/cancels
                     vm.composerFinished()
                 }
             } else {
@@ -83,7 +52,15 @@ struct BirthdaySenderView: View {
     }
 }
 
-/// Tracks the total number of birthday messages sent by the user
+// Helper extension for safe array access
+extension Array {
+    subscript(safe index: Int) -> Element? {
+        return indices.contains(index) ? self[index] : nil
+    }
+}
+
+
+/// Tracks birthday messages sent to contacts
 /// Data persists across app launches using UserDefaults
 class MessageCounter: ObservableObject {
     
@@ -96,30 +73,109 @@ class MessageCounter: ObservableObject {
         }
     }
     
-    // MARK: - Storage Key
+    /// Dictionary mapping contact identifiers to their message history
+    @Published var messageHistory: [String: [MessageRecord]] {
+        didSet {
+            saveToStorage()
+        }
+    }
     
-    private let storageKey = "totalBirthdayMessagesSent"
+    // MARK: - Storage Keys
+    
+    private let totalCountKey = "totalBirthdayMessagesSent"
+    private let messageHistoryKey = "birthdayMessageHistory"
     
     // MARK: - Initialization
     
     init() {
         // Load saved count from UserDefaults
-        self.totalMessagesSent = UserDefaults.standard.integer(forKey: storageKey)
+        self.totalMessagesSent = UserDefaults.standard.integer(forKey: totalCountKey)
+        
+        // Load message history from UserDefaults
+        if let data = UserDefaults.standard.data(forKey: messageHistoryKey),
+           let decoded = try? JSONDecoder().decode([String: [MessageRecord]].self, from: data) {
+            self.messageHistory = decoded
+        } else {
+            self.messageHistory = [:]
+        }
     }
     
     // MARK: - Public Methods
     
-    /// Call this method each time a birthday message is sent
-    func incrementMessageCount() {
+    /// Records a message sent to a specific contact
+    /// - Parameters:
+    ///   - contactIdentifier: Unique identifier for the contact (CNContact.identifier)
+    ///   - message: The message text that was sent
+    ///   - contactName: Optional name of the contact for easier reference
+    func recordMessage(to contactIdentifier: String, message: String, contactName: String? = nil) {
+        let record = MessageRecord(
+            message: message,
+            dateSent: Date(),
+            contactName: contactName
+        )
+        
+        if messageHistory[contactIdentifier] != nil {
+            messageHistory[contactIdentifier]?.append(record)
+        } else {
+            messageHistory[contactIdentifier] = [record]
+        }
+        
         totalMessagesSent += 1
     }
     
-    /// Reset the counter to zero
-    func resetCount() {
-        totalMessagesSent = 0
+    /// Retrieves all messages sent to a specific contact
+    /// - Parameter contactIdentifier: Unique identifier for the contact
+    /// - Returns: Array of message records, sorted by date (newest first)
+    func getMessages(for contactIdentifier: String) -> [MessageRecord] {
+        return messageHistory[contactIdentifier]?.sorted(by: { $0.dateSent > $1.dateSent }) ?? []
     }
-        
+    
+    /// Gets the most recent message sent to a contact
+    /// - Parameter contactIdentifier: Unique identifier for the contact
+    /// - Returns: The most recent message record, or nil if no messages exist
+    func getLastMessage(for contactIdentifier: String) -> MessageRecord? {
+        return messageHistory[contactIdentifier]?.max(by: { $0.dateSent < $1.dateSent })
+    }
+    
+    /// Reset the counter to zero and clear all message history
+    func resetAll() {
+        totalMessagesSent = 0
+        messageHistory = [:]
+    }
+    
+    /// Reset messages for a specific contact
+    /// - Parameter contactIdentifier: Unique identifier for the contact
+    func resetMessages(for contactIdentifier: String) {
+        if let count = messageHistory[contactIdentifier]?.count {
+            totalMessagesSent -= count
+        }
+        messageHistory.removeValue(forKey: contactIdentifier)
+    }
+    
+    // MARK: - Private Methods
+    
     private func saveToStorage() {
-        UserDefaults.standard.set(totalMessagesSent, forKey: storageKey)
+        UserDefaults.standard.set(totalMessagesSent, forKey: totalCountKey)
+        
+        if let encoded = try? JSONEncoder().encode(messageHistory) {
+            UserDefaults.standard.set(encoded, forKey: messageHistoryKey)
+        }
+    }
+}
+
+// MARK: - Supporting Types
+
+/// Represents a single birthday message sent to a contact
+struct MessageRecord: Codable, Identifiable {
+    let id: UUID
+    let message: String
+    let dateSent: Date
+    let contactName: String?
+    
+    init(message: String, dateSent: Date, contactName: String? = nil) {
+        self.id = UUID()
+        self.message = message
+        self.dateSent = dateSent
+        self.contactName = contactName
     }
 }

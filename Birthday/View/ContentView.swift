@@ -230,7 +230,8 @@ struct editView: View {
     var contact: Contact
     @StateObject private var messageVM = BirthdayMessageViewModel()
     @Environment(\.dismiss) var dismiss
-    
+    @StateObject private var messageCounter = MessageCounter()
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -281,14 +282,33 @@ struct editView: View {
             }
         }
         .sheet(isPresented: $messageVM.showTemplatePicker) {
-            MessageTemplatePickerView(messageVM: messageVM)
+            if #available(iOS 18.0, *) {
+                MessageTemplatePickerView(
+                    messageVM: messageVM,
+                    messageCounter: messageCounter
+                )
+            } else {
+                // Fallback for older iOS versions
+                Text("Template picker requires iOS 18 or later")
+                    .foregroundColor(.white)
+            }
         }
         .fullScreenCover(isPresented: $messageVM.showComposer) {
             if MFMessageComposeViewController.canSendText() {
                 MessageComposerView(
                     recipients: messageVM.composerRecipients,
                     body: messageVM.composerBody,
-                    onFinish: { _ in
+                    onFinish: { result in
+                        // Record message when sent
+                        if result == .sent,
+                           let cnContact = messageVM.todaysBirthdayContacts.first {
+                            messageCounter.recordMessage(
+                                to: cnContact.identifier,
+                                message: messageVM.composerBody,
+                                contactName: contact.name
+                            )
+                        }
+                        
                         messageVM.composerFinished()
                         dismiss()
                     }
