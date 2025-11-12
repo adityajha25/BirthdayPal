@@ -128,6 +128,7 @@ struct browseMonth: View {
 }
 
 struct AchievementCardView: View {
+    @StateObject private var messageCounter = MessageCounter()
     var body: some View {
         ZStack {
             // Background card
@@ -151,7 +152,7 @@ struct AchievementCardView: View {
                         .foregroundColor(.gray)
 
                     HStack(alignment: .lastTextBaseline, spacing: 4) {
-                        Text("20")
+                        Text("\(messageCounter.totalMessagesSent)")
                             .font(.system(size: 50, weight: .bold))
                             .foregroundColor(.white)
                         Text("birthdays")
@@ -224,11 +225,13 @@ struct BdayCard: View {
             }.padding(.horizontal)
     }
 }
+
 struct editView: View {
     var contact: Contact
     @StateObject private var messageVM = BirthdayMessageViewModel()
     @Environment(\.dismiss) var dismiss
-    
+    @StateObject private var messageCounter = MessageCounter()
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -241,6 +244,21 @@ struct editView: View {
                 Text(contact.name)
                     .font(.headline)
                     .foregroundColor(.gray)
+                
+                // Display Birthday
+                if let birthday = contact.birthday {
+                    VStack(spacing: 8) {
+                        Text("🎂")
+                            .font(.system(size: 40))
+                        Text(formatBirthday(birthday))
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                    }
+                    .padding()
+                    .background(Color(white: 0.15))
+                    .cornerRadius(12)
+                }
                 
                 Spacer()
                 
@@ -264,14 +282,33 @@ struct editView: View {
             }
         }
         .sheet(isPresented: $messageVM.showTemplatePicker) {
-            MessageTemplatePickerView(messageVM: messageVM)
+            if #available(iOS 18.0, *) {
+                MessageTemplatePickerView(
+                    messageVM: messageVM,
+                    messageCounter: messageCounter
+                )
+            } else {
+                // Fallback for older iOS versions
+                Text("Template picker requires iOS 18 or later")
+                    .foregroundColor(.white)
+            }
         }
         .fullScreenCover(isPresented: $messageVM.showComposer) {
             if MFMessageComposeViewController.canSendText() {
                 MessageComposerView(
                     recipients: messageVM.composerRecipients,
                     body: messageVM.composerBody,
-                    onFinish: { _ in
+                    onFinish: { result in
+                        // Record message when sent
+                        if result == .sent,
+                           let cnContact = messageVM.todaysBirthdayContacts.first {
+                            messageCounter.recordMessage(
+                                to: cnContact.identifier,
+                                message: messageVM.composerBody,
+                                contactName: contact.name
+                            )
+                        }
+                        
                         messageVM.composerFinished()
                         dismiss()
                     }
@@ -305,6 +342,22 @@ struct editView: View {
         }
     }
     
+    private func formatBirthday(_ birthday: DateComponents) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .long
+        
+        if let date = Calendar.current.date(from: birthday) {
+            return formatter.string(from: date)
+        }
+        
+        if let month = birthday.month, let day = birthday.day {
+            let monthName = Calendar.current.monthSymbols[month - 1]
+            return "\(monthName) \(day)"
+        }
+        
+        return "Unknown"
+    }
+    
     private func convertToCNContact(_ contact: Contact) -> CNContact {
         let cnContact = CNMutableContact()
         
@@ -328,6 +381,7 @@ struct editView: View {
         return cnContact.copy() as! CNContact
     }
 }
+
 @available(iOS 17.0, *)
 struct BrowseBirthdaysView: View {
     @State private var selectedMonth = "January"
