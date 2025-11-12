@@ -34,7 +34,6 @@ struct LandingPage: View {
                         Text("\(contactsVM.birthdaysThisMonthCount) this month").foregroundStyle(.white).font(.title3)
                     }.padding()
                     
-                    // Add loading and error states
                     if contactsVM.isLoading {
                         Spacer()
                         ProgressView("Loading contacts...")
@@ -85,7 +84,7 @@ struct LandingPage: View {
                         }
                     }
                     
-                    AchievementCardView()
+                    AchievementCardView(upcomingCount: contactsVM.contactsWithBirthday.count)
                     
                     NavigationLink(destination: BrowseBirthdaysView(contactsVM: contactsVM)) {
                         browseMonth(screenwidth: geometry.size.width, screenheight: geometry.size.height)
@@ -128,15 +127,15 @@ struct browseMonth: View {
 }
 
 struct AchievementCardView: View {
+    let upcomingCount: Int
+
     var body: some View {
         ZStack {
-            // Background card
             RoundedRectangle(cornerRadius: 20)
                 .fill(Color(red: 0.1, green: 0.1, blue: 0.1))
                 .shadow(radius: 5)
 
             HStack(alignment: .top) {
-                // Left content
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 6) {
                         Image(systemName: "sparkles")
@@ -151,7 +150,7 @@ struct AchievementCardView: View {
                         .foregroundColor(.gray)
 
                     HStack(alignment: .lastTextBaseline, spacing: 4) {
-                        Text("20")
+                        Text("\(upcomingCount)")
                             .font(.system(size: 50, weight: .bold))
                             .foregroundColor(.white)
                         Text("birthdays")
@@ -174,9 +173,11 @@ struct AchievementCardView: View {
                     .padding(.top, 16)
             }
         }
-        .frame(height: 150).padding()
+        .frame(height: 150)
+        .padding()
     }
 }
+
 
 struct BdayCard: View {
     var contact : Contact
@@ -215,11 +216,7 @@ struct BdayCard: View {
                         Text("In \(contact.daysToBirthday!) days").foregroundStyle(.white)
                     }
                     Spacer()
-//                    if contact.gender == "male" {
-//                        Text("👨").font(.title)
-//                    } else if contact.gender == "female" {
-//                        Text("👧").font(.title)
-//                    }
+                }
                 }.padding(10)
             }.padding(.horizontal)
     }
@@ -407,7 +404,6 @@ struct BrowseBirthdaysView: View {
     }
 }
 
-// MARK: - By Month View
 @available(iOS 17.0, *)
 struct ByMonthView: View {
     @Binding var selectedMonth: String

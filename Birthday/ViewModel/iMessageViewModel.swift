@@ -60,13 +60,27 @@ import Combine
     
     var birthdaysThisMonthCount: Int {
         let calendar = Calendar.current
-        let currentMonth = calendar.component(.month, from: Date())
-        
-        return contactsWithBirthday.filter {
-            guard let month = $0.birthday?.month else { return false }
-            return month == currentMonth
+        let now = Date()
+
+        // Current month + year
+        let currentComponents = calendar.dateComponents([.month, .year], from: now)
+
+        return contactsWithBirthday.filter { contact in
+            // daysToBirthday = days from *today* until their next birthday
+            guard let days = contact.daysToBirthday,
+                  let nextBirthdayDate = calendar.date(byAdding: .day, value: days, to: now)
+            else {
+                return false
+            }
+
+            let nextComponents = calendar.dateComponents([.month, .year], from: nextBirthdayDate)
+
+            // Only count if the *next* birthday is in THIS month of THIS year
+            return nextComponents.month == currentComponents.month &&
+                   nextComponents.year == currentComponents.year
         }.count
     }
+
     
     var birthdaysThisMonth: [Contact] {
         let calendar = Calendar.current

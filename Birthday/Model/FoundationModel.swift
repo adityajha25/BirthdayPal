@@ -3,9 +3,6 @@ import SwiftUI
 import UIKit
 import Combine
 
-/// Helper to access Apple's Writing Tools for birthday message rewriting
-/// Note: Writing Tools in iOS 18+ work through the UI, not as a direct API
-/// This provides a SwiftUI view that enables Writing Tools on text
 @available(iOS 18.0, *)
 struct WritingToolsTextEditor: UIViewRepresentable {
     @Binding var text: String

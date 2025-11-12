@@ -1,21 +1,21 @@
-//
-//  MessageComposerView.swift
-//  Birthday
-//
-//  Created by Archit Lakhani on 10/30/25.
-//
-
 import SwiftUI
 import MessageUI
 
 struct MessageComposerView: UIViewControllerRepresentable {
+    typealias UIViewControllerType = MFMessageComposeViewController
+    typealias Context = UIViewControllerRepresentableContext<MessageComposerView>
+
     var recipients: [String]
     var body: String
     var onFinish: (MessageComposeResult) -> Void
 
+    // Coordinator to bridge UIKit delegate back to SwiftUI
     class Coordinator: NSObject, MFMessageComposeViewControllerDelegate {
         let parent: MessageComposerView
-        init(_ parent: MessageComposerView) { self.parent = parent }
+
+        init(parent: MessageComposerView) {
+            self.parent = parent
+        }
 
         func messageComposeViewController(
             _ controller: MFMessageComposeViewController,
@@ -27,7 +27,9 @@ struct MessageComposerView: UIViewControllerRepresentable {
         }
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator(self) }
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
 
     func makeUIViewController(context: Context) -> MFMessageComposeViewController {
         let vc = MFMessageComposeViewController()
@@ -37,5 +39,9 @@ struct MessageComposerView: UIViewControllerRepresentable {
         return vc
     }
 
-    func updateUIViewController(_ uiViewController: MFMessageComposeViewController, context: Context) {}
+    func updateUIViewController(_ uiViewController: MFMessageComposeViewController, context: Context) {
+        // In case you ever change recipients/body while the sheet is up
+        uiViewController.recipients = recipients
+        uiViewController.body = body
+    }
 }
