@@ -537,8 +537,7 @@ struct ByMonthView: View {
                     .padding(.vertical, 8)
                     .background(Color(white: 0.15))
                     .cornerRadius(10)
-                    .frame(width: 160)
-
+                    .frame(width: 300)
                     Spacer()
                 }
                 .padding(.horizontal)
