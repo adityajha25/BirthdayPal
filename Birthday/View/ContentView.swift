@@ -259,8 +259,12 @@ struct BdayCard: View {
                         .font(.system(size: 25))
                         .foregroundStyle(.white)
                     if let days = contact.daysToBirthday {
-                        Text("In \(days) days")
-                            .foregroundStyle(.white)
+                        if days != 0 {
+                            Text("In \(days) days")
+                                .foregroundStyle(.white)
+                        } else {
+                            Text("Birthday Today 🎂 🎁 🎉").foregroundStyle(.white).fontWeight(.bold)
+                        }
                     }
                 }
 
