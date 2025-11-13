@@ -95,7 +95,6 @@ struct LandingPage: View {
                                 NavigationLink(
                                     destination: editView(
                                         contact: contact,
-                                        contactsVM: contactsVM  // pass view model down
                                     )
                                 ) {
                                     BdayCard(
@@ -278,29 +277,42 @@ struct BdayCard: View {
 }
 
 // MARK: - Edit View
-
 struct editView: View {
     var contact: Contact
-    var contactsVM: ContactViewModel          // get the shared view model
-
     @StateObject private var messageVM = BirthdayMessageViewModel()
     @Environment(\.dismiss) var dismiss
+    @StateObject private var messageCounter = MessageCounter()
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-
+            
             VStack(spacing: 20) {
                 Text("Send Birthday Message")
                     .font(.title)
                     .foregroundColor(.white)
-
+                
                 Text(contact.name)
                     .font(.headline)
                     .foregroundColor(.gray)
-
+                
+                // Display Birthday
+                if let birthday = contact.birthday {
+                    VStack(spacing: 8) {
+                        Text("🎂")
+                            .font(.system(size: 40))
+                        Text(formatBirthday(birthday))
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                    }
+                    .padding()
+                    .background(Color(white: 0.15))
+                    .cornerRadius(12)
+                }
+                
                 Spacer()
-
+                
                 Button(action: {
                     let cnContact = convertToCNContact(contact)
                     messageVM.startBirthdayFlow(with: [cnContact])
@@ -316,12 +328,20 @@ struct editView: View {
                     .cornerRadius(12)
                 }
                 .padding(.horizontal)
-
+                
                 Spacer()
             }
         }
         .sheet(isPresented: $messageVM.showTemplatePicker) {
-            MessageTemplatePickerView(messageVM: messageVM)
+            if #available(iOS 18.0, *) {
+                MessageTemplatePickerView(
+                    messageVM: messageVM,
+                )
+            } else {
+                // Fallback for older iOS versions
+                Text("Template picker requires iOS 18 or later")
+                    .foregroundColor(.white)
+            }
         }
         .fullScreenCover(isPresented: $messageVM.showComposer) {
             if MFMessageComposeViewController.canSendText() {
@@ -329,10 +349,16 @@ struct editView: View {
                     recipients: messageVM.composerRecipients,
                     body: messageVM.composerBody,
                     onFinish: { result in
-                        // only count when the message was actually sent
-                        if result == .sent {
-                            contactsVM.incrementRememberedBirthdays()
+                        // Record message when sent
+                        if result == .sent,
+                           let cnContact = messageVM.todaysBirthdayContacts.first {
+                            messageCounter.recordMessage(
+                                to: cnContact.identifier,
+                                message: messageVM.composerBody,
+                                contactName: contact.name
+                            )
                         }
+                        
                         messageVM.composerFinished()
                         dismiss()
                     }
@@ -365,10 +391,26 @@ struct editView: View {
             }
         }
     }
-
+    
+    private func formatBirthday(_ birthday: DateComponents) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .long
+        
+        if let date = Calendar.current.date(from: birthday) {
+            return formatter.string(from: date)
+        }
+        
+        if let month = birthday.month, let day = birthday.day {
+            let monthName = Calendar.current.monthSymbols[month - 1]
+            return "\(monthName) \(day)"
+        }
+        
+        return "Unknown"
+    }
+    
     private func convertToCNContact(_ contact: Contact) -> CNContact {
         let cnContact = CNMutableContact()
-
+        
         let nameComponents = contact.name.components(separatedBy: " ")
         if nameComponents.count > 0 {
             cnContact.givenName = nameComponents[0]
@@ -376,19 +418,16 @@ struct editView: View {
         if nameComponents.count > 1 {
             cnContact.familyName = nameComponents[1...].joined(separator: " ")
         }
-
+        
         if let phoneNumber = contact.phoneNumber {
-            let phone = CNLabeledValue(
-                label: CNLabelPhoneNumberMain,
-                value: CNPhoneNumber(stringValue: phoneNumber)
-            )
+            let phone = CNLabeledValue(label: CNLabelPhoneNumberMain, value: CNPhoneNumber(stringValue: phoneNumber))
             cnContact.phoneNumbers = [phone]
         }
-
+        
         if let birthday = contact.birthday {
             cnContact.birthday = birthday
         }
-
+        
         return cnContact.copy() as! CNContact
     }
 }
