@@ -260,8 +260,12 @@ struct BdayCard: View {
                         .font(.system(size: 25))
                         .foregroundStyle(.white)
                     if let days = contact.daysToBirthday {
-                        Text("In \(days) days")
-                            .foregroundStyle(.white)
+                        if days != 0 {
+                            Text("In \(days) days")
+                                .foregroundStyle(.white)
+                        } else {
+                            Text("Birthday Today 🎂 🎁 🎉").foregroundStyle(.white).fontWeight(.bold)
+                        }
                     }
                 }
 
@@ -277,7 +281,7 @@ struct BdayCard: View {
 
 struct editView: View {
     var contact: Contact
-    var contactsVM: ContactViewModel          // 👈 get the shared view model
+    var contactsVM: ContactViewModel          // get the shared view model
 
     @StateObject private var messageVM = BirthdayMessageViewModel()
     @Environment(\.dismiss) var dismiss
@@ -325,7 +329,7 @@ struct editView: View {
                     recipients: messageVM.composerRecipients,
                     body: messageVM.composerBody,
                     onFinish: { result in
-                        // 👇 only count when the message was actually sent
+                        // only count when the message was actually sent
                         if result == .sent {
                             contactsVM.incrementRememberedBirthdays()
                         }
