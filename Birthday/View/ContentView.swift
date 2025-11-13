@@ -277,7 +277,7 @@ struct BdayCard: View {
 
 struct editView: View {
     var contact: Contact
-    var contactsVM: ContactViewModel          // 👈 get the shared view model
+    var contactsVM: ContactViewModel
 
     @StateObject private var messageVM = BirthdayMessageViewModel()
     @Environment(\.dismiss) var dismiss
