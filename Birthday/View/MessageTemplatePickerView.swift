@@ -11,7 +11,7 @@ struct MessageTemplatePickerView: View {
     @State private var selectedTone: MessageTone?
     @State private var editableMessage: String = ""
     @State private var showEditor: Bool = false
-    @State priv                       ate var userHint: String = ""      // one-liner input
+    @State private var userHint: String = ""      // one-liner input
     @State private var llmReady: Bool = false     // track if LLM is available
 
     // for "Rewrite" support — remember what we used the first time

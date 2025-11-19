@@ -126,11 +126,11 @@ struct LandingPage: View {
             contactsVM.loadContacts()
             BirthdayNotificationManager.shared.requestAuthorizationIfNeeded()
             // first schedule (midnight alerts for birthdays)
-            BirthdayNotificationManager.shared.scheduleAnnualMidnight(for: contactsVM.contacts)
+         //   BirthdayNotificationManager.shared.scheduleAnnualMidnight(for: contactsVM.contacts)
         }
         // reschedule whenever contacts list changes
         .onReceive(contactsVM.$contacts) { _ in
-            BirthdayNotificationManager.shared.scheduleAnnualMidnight(for: contactsVM.contacts)
+         //   BirthdayNotificationManager.shared.scheduleAnnualMidnight(for: contactsVM.contacts)
         }
     }
 }
