@@ -13,7 +13,7 @@ struct Contact: Identifiable {
     let id = UUID()
     let name: String
     let phoneNumber: String?
-    let birthday: DateComponents?
+    var birthday: DateComponents?
     
     /// Returns a comparable date for sorting purposes
     /// Converts birthday to a date in the current year for comparison

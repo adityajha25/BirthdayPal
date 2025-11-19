@@ -452,13 +452,18 @@ struct EditView: View {
 }
 
 struct addMissingView: View {
-    var contactsVM: ContactViewModel
+    @ObservedObject var contactsVM: ContactViewModel
     var body: some View {
         GeometryReader { geometry in
             VStack {
                 Text("Add Mising Birthdays").bold().font(.system(size: 25)).foregroundStyle(.white)
-                ForEach(contactsVM.contactsWithoutBirthday){ contact in
-                    addMissingCard(contact: contact, screenheight: geometry.size.height)
+                ForEach($contactsVM.contacts){ $contact in
+                    if contact.birthday == nil {
+                        addMissingCard(contact: $contact, screenheight: geometry.size.height)
+                    }
+                }
+                if contactsVM.contactsWithoutBirthday.count == 0 {
+                    Text("🎉 No Birthdays Missing 🎉").bold().font(.system(size: 20)).foregroundStyle(.white).padding()
                 }
                 Spacer()
             }.frame(width: geometry.size.width, height: geometry.size.height).background(Color.black)
@@ -467,7 +472,7 @@ struct addMissingView: View {
 }
 
 struct addMissingCard: View {
-    @State var contact: Contact
+    @Binding var contact: Contact
     var screenheight : CGFloat
     var phoneNumber: String {
         contact.phoneNumber ?? ""
@@ -513,8 +518,20 @@ struct addMissingCalendar: View {
                     .cornerRadius(16)
                     .padding()
                     .colorScheme(.dark)
+                Button(action: {
+                    let components = Calendar.current.dateComponents([.year, .month, .day], from: selectedDate)
+                    contact.birthday = components
+                    
+                }){
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(.gray)
+                            .frame(height: geometry.size.height * 0.05)
+                        Text("Save").foregroundStyle(.white)
+                    }
+                }
             }.frame(width: geometry.size.width, height: geometry.size.height).background(Color.black)
-            // Add in missingBirthdays functionality - adding a birthday to contact and making sure it updates in ViewModel, to be moved to contacts with birthday list
+
         }
     }
 }
