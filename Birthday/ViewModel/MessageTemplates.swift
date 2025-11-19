@@ -11,6 +11,8 @@ enum MessageTone: String, CaseIterable, Identifiable {
     case formal, casual, funny, romantic
     var id: String { rawValue }
 }
+
+
 struct MessageTemplates {
     static func make(tone: MessageTone, name: String, age: Int?) -> String {
         switch tone {

@@ -157,7 +157,15 @@ struct LandingPage: View {
             }
         }
         .onAppear {
+            // load contacts + ask for notification permission
             contactsVM.loadContacts()
+            BirthdayNotificationManager.shared.requestAuthorizationIfNeeded()
+            // first schedule (midnight alerts for birthdays)
+            BirthdayNotificationManager.shared.scheduleAnnualMidnight(for: contactsVM.contacts)
+        }
+        // reschedule whenever contacts list changes
+        .onReceive(contactsVM.$contacts) { _ in
+            BirthdayNotificationManager.shared.scheduleAnnualMidnight(for: contactsVM.contacts)
         }
     }
 }
@@ -785,6 +793,8 @@ struct CardButtonStyle: ButtonStyle {
 
 struct editView: View {
     var contact: Contact
+    var contactsVM: ContactViewModel
+
     @StateObject private var messageVM = BirthdayMessageViewModel()
     @Environment(\.dismiss) var dismiss
     @StateObject private var messageCounter = MessageCounter()
@@ -928,7 +938,7 @@ struct editView: View {
                     )
                     .padding(.horizontal, 24)
                 }
-                
+
                 Spacer()
                 
                 // Send message button with glass effect
@@ -1012,8 +1022,7 @@ struct editView: View {
                 .ignoresSafeArea()
             } else {
                 VStack(spacing: 20) {
-                    Text("Cannot Send Messages")
-                        .font(.headline)
+                    Text("Cannot Send Messages").font(.headline)
                     Text("This device is not configured to send messages.")
                         .multilineTextAlignment(.center)
                     Button("OK") {
@@ -1028,53 +1037,121 @@ struct editView: View {
             }
         }
         .alert("Error", isPresented: .constant(messageVM.lastError != nil)) {
-            Button("OK") {
-                messageVM.lastError = nil
-            }
+            Button("OK") { messageVM.lastError = nil }
         } message: {
-            if let error = messageVM.lastError {
-                Text(error)
-            }
+            if let error = messageVM.lastError { Text(error) }
         }
     }
-    
+
     private func formatBirthday(_ birthday: DateComponents) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .long
-        
         if let date = Calendar.current.date(from: birthday) {
             return formatter.string(from: date)
         }
-        
         if let month = birthday.month, let day = birthday.day {
             let monthName = Calendar.current.monthSymbols[month - 1]
             return "\(monthName) \(day)"
         }
-        
         return "Unknown"
     }
-    
+
     private func convertToCNContact(_ contact: Contact) -> CNContact {
-        let cnContact = CNMutableContact()
-        
-        let nameComponents = contact.name.components(separatedBy: " ")
-        if nameComponents.count > 0 {
-            cnContact.givenName = nameComponents[0]
+        let cn = CNMutableContact()
+        let parts = contact.name.split(separator: " ")
+        if let first = parts.first { cn.givenName = String(first) }
+        if parts.count > 1 { cn.familyName = parts.dropFirst().joined(separator: " ") }
+        if let phone = contact.phoneNumber {
+            cn.phoneNumbers = [CNLabeledValue(label: CNLabelPhoneNumberMain,
+                                              value: CNPhoneNumber(stringValue: phone))]
         }
-        if nameComponents.count > 1 {
-            cnContact.familyName = nameComponents[1...].joined(separator: " ")
+        if let b = contact.birthday { cn.birthday = b }
+        return cn.copy() as! CNContact
+    }
+}
+
+struct addMissingView: View {
+    @ObservedObject var contactsVM: ContactViewModel
+    var body: some View {
+        GeometryReader { geometry in
+            VStack {
+                Text("Add Mising Birthdays").bold().font(.system(size: 25)).foregroundStyle(.white)
+                ForEach($contactsVM.contacts){ $contact in
+                    if contact.birthday == nil {
+                        addMissingCard(contact: $contact, screenheight: geometry.size.height)
+                    }
+                }
+                if contactsVM.contactsWithoutBirthday.count == 0 {
+                    Text("🎉 No Birthdays Missing 🎉").bold().font(.system(size: 20)).foregroundStyle(.white).padding()
+                }
+                Spacer()
+            }.frame(width: geometry.size.width, height: geometry.size.height).background(Color.black)
         }
-        
-        if let phoneNumber = contact.phoneNumber {
-            let phone = CNLabeledValue(label: CNLabelPhoneNumberMain, value: CNPhoneNumber(stringValue: phoneNumber))
-            cnContact.phoneNumbers = [phone]
+    }
+}
+
+struct addMissingCard: View {
+    @Binding var contact: Contact
+    var screenheight : CGFloat
+    var phoneNumber: String {
+        contact.phoneNumber ?? ""
+    }
+    @State private var showSheet = false
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(red: 0.1, green: 0.1, blue: 0.1))
+                .frame(height: screenheight * 0.20)
+            HStack {
+                VStack (alignment: .leading){
+                    Text(contact.name).bold().font(.system(size: 25)).foregroundStyle(.white)
+                    Text(phoneNumber).bold().font(.system(size: 20)).foregroundStyle(.gray)
+                    Button(action: {showSheet = true}) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(.gray)
+                                .frame(height: screenheight * 0.05)
+                            Text("🗓️ Add Birthday").foregroundStyle(.white)
+                        }
+                    }.sheet(isPresented: $showSheet) {
+                        addMissingCalendar(contact: $contact)
+                    }
+                }
+                Spacer()
+            }.padding()
+        }.padding()
+    }
+}
+
+struct addMissingCalendar: View {
+    @Binding var contact : Contact
+    @State private var selectedDate = Date()
+    var body: some View {
+        GeometryReader{ geometry in
+            VStack{
+                Text("Add Missing Birthday").bold().font(.system(size: 25)).foregroundStyle(.white)
+                Text("Select a date for \(contact.name)").bold().font(.system(size: 20)).foregroundStyle(.gray)
+                DatePicker("", selection: $selectedDate, displayedComponents: .date)
+                    .datePickerStyle(GraphicalDatePickerStyle())
+                    .background(Color(white: 0.15))
+                    .cornerRadius(16)
+                    .padding()
+                    .colorScheme(.dark)
+                Button(action: {
+                    let components = Calendar.current.dateComponents([.year, .month, .day], from: selectedDate)
+                    contact.birthday = components
+                    
+                }){
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(.gray)
+                            .frame(height: geometry.size.height * 0.05)
+                        Text("Save").foregroundStyle(.white)
+                    }
+                }
+            }.frame(width: geometry.size.width, height: geometry.size.height).background(Color.black)
+
         }
-        
-        if let birthday = contact.birthday {
-            cnContact.birthday = birthday
-        }
-        
-        return cnContact.copy() as! CNContact
     }
 }
 
@@ -1088,14 +1165,11 @@ struct BrowseBirthdaysView: View {
     @State private var animateGradient = false
     var contactsVM: ContactViewModel
 
-    enum ViewMode {
-        case byMonth
-        case calendar
-    }
+    enum ViewMode { case byMonth, calendar }
 
     let months = [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
+        "January","February","March","April","May","June",
+        "July","August","September","October","November","December"
     ]
 
     var body: some View {
@@ -1643,3 +1717,4 @@ struct GlassCalendarContactCard: View {
         )
     }
 }
+

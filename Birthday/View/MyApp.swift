@@ -10,6 +10,9 @@ import SwiftUI
 
 @main
 struct MyApp: App {
+    init() {
+            NotificationsManager.shared.setUp()
+        }
     var body: some Scene {
         WindowGroup {
             ContentView()
