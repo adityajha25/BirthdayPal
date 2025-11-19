@@ -45,40 +45,45 @@ struct RememberedBirthdaysWidgetView: View {
     var entry: BirthdayWidgetEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Birthdays remembered")
-                .font(.caption)
-                .foregroundColor(.gray)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .foregroundColor(.yellow)
+                    .font(.caption)
+                Text("Birthdays Remembered")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white.opacity(0.8))
+            }
 
-            HStack(alignment: .lastTextBaseline, spacing: 4) {
+            HStack(alignment: .lastTextBaseline, spacing: 6) {
                 Text("\(entry.data.rememberedCount)")
-                    .font(.system(size: 40, weight: .bold))
-                    .foregroundColor(.white)
+                    .font(.system(size: 44, weight: .bold))
+                    .foregroundColor(.cyan)
                 Text("this year")
                     .font(.subheadline)
-                    .foregroundColor(.white)
+                    .foregroundColor(.white.opacity(0.9))
             }
 
             Spacer()
 
             if entry.data.rememberedCount == 0 {
-                Text("Start sending birthday messages 🎉")
-                    .font(.footnote)
-                    .foregroundColor(.gray)
+                Text("Start sending messages 🎉")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.6))
             } else if entry.data.rememberedCount < 10 {
                 Text("Nice start – keep going! 🎂")
-                    .font(.footnote)
-                    .foregroundColor(.gray)
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.6))
             } else {
                 Text("You're a birthday pro 🥳")
-                    .font(.footnote)
-                    .foregroundColor(.gray)
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.6))
             }
         }
-        .padding()
-        // 👇 This is what fixes the “please adopt containerBackground” warning
+        .padding(16)
         .containerBackground(for: .widget) {
-            Color.black
+            Color(red: 0.08, green: 0.12, blue: 0.28)
         }
     }
 }
@@ -89,36 +94,64 @@ struct UpcomingBirthdayWidgetView: View {
     var entry: BirthdayWidgetEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("🎂 Upcoming birthday")
-                .font(.caption)
-                .foregroundColor(.gray)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Text("🎂")
+                    .font(.caption)
+                Text("Upcoming Birthday")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white.opacity(0.8))
+            }
 
             if let name = entry.data.nextName,
                let days = entry.data.daysToNext {
-                Text(name)
-                    .font(.headline)
-                    .foregroundColor(.white)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(name)
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
 
-                Text(days == 0 ? "Today 🎉"
-                               : "In \(days) day\(days == 1 ? "" : "s")")
-                    .font(.subheadline)
-                    .foregroundColor(.white)
+                    HStack(spacing: 6) {
+                        if days == 0 {
+                            Image(systemName: "party.popper.fill")
+                                .foregroundColor(.yellow)
+                                .font(.caption)
+                            Text("Today!")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.yellow)
+                        } else {
+                            Image(systemName: "clock.fill")
+                                .foregroundColor(.cyan)
+                                .font(.caption2)
+                            Text("In \(days) day\(days == 1 ? "" : "s")")
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.9))
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(Color(red: 0.12, green: 0.16, blue: 0.35).opacity(0.6))
+                    )
+                }
             } else {
                 Text("No upcoming birthdays")
-                    .font(.headline)
-                    .foregroundColor(.white)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.7))
             }
 
             Spacer()
 
             Text("\(entry.data.upcomingThisMonth) this month")
-                .font(.footnote)
-                .foregroundColor(.gray)
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.6))
         }
-        .padding()
+        .padding(16)
         .containerBackground(for: .widget) {
-            Color.black
+            Color(red: 0.08, green: 0.12, blue: 0.28)
         }
     }
 }
@@ -152,4 +185,3 @@ struct UpcomingBirthdayWidget: Widget {
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
-
