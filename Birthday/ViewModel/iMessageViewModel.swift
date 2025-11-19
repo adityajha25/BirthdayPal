@@ -28,7 +28,7 @@ final class ContactViewModel: ObservableObject {
         self.contacts = contacts
         self.rememberedBirthdaysCount = UserDefaults.standard.integer(forKey: rememberedCountKey)
 
-        // Listen for "message sent" events from the composer
+        // Listen for "message sent" events from the composer (BirthdayMessageViewModel posts this)
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(onBirthdayMessageSent),
@@ -55,11 +55,15 @@ final class ContactViewModel: ObservableObject {
                 case .success(let fetchedContacts):
                     self.contacts = fetchedContacts
 
-                    // 🔔 Ensure permission (asked once if not determined)
+                    // 🔔 Ask notification permission if needed (only prompts once)
                     BirthdayNotificationManager.shared.requestAuthorizationIfNeeded()
 
-                    // 🔔 Schedule 00:00 repeating notifications per contact (month/day)
-                    BirthdayNotificationManager.shared.scheduleAnnualMidnight(for: fetchedContacts)
+                    // 🔔 Schedule *today’s* birthday alerts at 9:00 (idempotent; safe to call daily)
+                    BirthdayNotificationManager.shared.refreshDailySchedule(
+                        contacts: self.contactsWithBirthday,
+                        fireHour: 9,
+                        fireMinute: 0
+                    )
 
                     // 🔁 Update widget data
                     self.updateWidgetData()

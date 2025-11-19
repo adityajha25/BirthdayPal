@@ -2,7 +2,7 @@
 
 import SwiftUI
 import Contacts
-import FoundationModels
+import FoundationModels   // used only to detect LLM availability
 
 struct MessageTemplatePickerView: View {
     @ObservedObject var messageVM: BirthdayMessageViewModel
@@ -11,8 +11,15 @@ struct MessageTemplatePickerView: View {
     @State private var selectedTone: MessageTone?
     @State private var editableMessage: String = ""
     @State private var showEditor: Bool = false
-    @State private var userHint: String = ""
-    @State private var llmReady: Bool = false
+    @State priv                       ate var userHint: String = ""      // one-liner input
+    @State private var llmReady: Bool = false     // track if LLM is available
+
+    // for "Rewrite" support — remember what we used the first time
+    @State private var lastTone: MessageTone?
+    @State private var lastName: String = ""
+    @State private var lastAge: Int? = nil
+    @State private var lastHint: String? = nil
+    @State private var isRewriting: Bool = false
 
     // current contact helper
     private var currentContact: CNContact? {
@@ -28,8 +35,10 @@ struct MessageTemplatePickerView: View {
                 Color.black.ignoresSafeArea()
 
                 if !showEditor {
+                    // Template Selection View
                     VStack(spacing: 20) {
                         if let contact = currentContact {
+                            // Header
                             VStack(spacing: 8) {
                                 Text("🎉")
                                     .font(.system(size: 60))
@@ -45,32 +54,33 @@ struct MessageTemplatePickerView: View {
 
                             Spacer()
 
+                            // One-liner hint field
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Add a note (optional)")
                                     .font(.subheadline)
                                     .foregroundColor(.gray)
-
-                                ZStack(alignment: .topLeading) {
-                                    if userHint.isEmpty {
-                                        Text("e.g. mention our trip, keep it short + funny")
-                                            .foregroundColor(.gray)
-                                            .padding(.horizontal, 14)
-                                            .padding(.vertical, 12)
-                                            .allowsHitTesting(false)
-                                    }
-
-                                    TextEditor(text: $userHint)
-                                        .frame(minHeight: 60, maxHeight: 100)
-                                        .padding(8)
+                                // Use iOS 17 multiline TextField so it wraps naturally
+                                if #available(iOS 17.0, *) {
+                                    TextField("e.g. mention our trip, keep it short + funny",
+                                              text: $userHint,
+                                              axis: .vertical)
+                                        .lineLimit(1...3)
+                                        .padding(10)
                                         .background(Color(white: 0.15))
                                         .cornerRadius(10)
-                                        .scrollContentBackground(.hidden)
                                         .foregroundColor(.white)
-                                        .font(.body)
+                                } else {
+                                    TextField("e.g. mention our trip, keep it short + funny",
+                                              text: $userHint)
+                                        .padding(10)
+                                        .background(Color(white: 0.15))
+                                        .cornerRadius(10)
+                                        .foregroundColor(.white)
                                 }
                             }
                             .padding(.horizontal)
 
+                            // Template / Tone options
                             VStack(spacing: 16) {
                                 Text("Choose a message style:")
                                     .font(.subheadline)
@@ -129,8 +139,10 @@ struct MessageTemplatePickerView: View {
                         }
                     }
                 } else {
+                    // Message Editor View
                     VStack(spacing: 20) {
-                        HStack {
+                        // Header
+                        HStack(spacing: 12) {
                             Button("Back") {
                                 showEditor = false
                             }
@@ -144,14 +156,27 @@ struct MessageTemplatePickerView: View {
 
                             Spacer()
 
+                            // REWRITE button
+                            if isRewriting {
+                                ProgressView()
+                                    .tint(.blue)
+                            } else {
+                                Button("Rewrite") {
+                                    Task { await rewriteMessage() }
+                                }
+                                .foregroundColor(.blue)
+                            }
+
                             Button("Send") {
                                 sendEditedMessage()
                             }
                             .foregroundColor(.blue)
                             .bold()
                         }
-                        .padding()
+                        .padding(.horizontal)
+                        .padding(.top, 12)
 
+                        // Text Editor
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Preview:")
                                 .font(.subheadline)
@@ -175,15 +200,16 @@ struct MessageTemplatePickerView: View {
 
                         Spacer()
                     }
-                    .padding(.top, 20)
+                    .padding(.top, 8)
                 }
             }
             .navigationBarHidden(true)
         }
-        .task {
-            await updateLLMReadyFlag()
-        }
+        // Check LLM availability when this view appears
+        .task { await updateLLMReadyFlag() }
     }
+
+    // MARK: - Async LLM hook
 
     private func generateMessageForTone(_ tone: MessageTone, contact: CNContact) async {
         await MainActor.run { messageVM.isGenerating = true }
@@ -201,11 +227,46 @@ struct MessageTemplatePickerView: View {
         )
 
         await MainActor.run {
+            // Store for "Rewrite"
+            lastTone = tone
+            lastName = name
+            lastAge = age
+            lastHint = effectiveHint
+
             editableMessage = body
             messageVM.isGenerating = false
             showEditor = true
         }
     }
+
+    // MARK: - Rewrite
+
+    private func rewriteMessage() async {
+        guard let tone = lastTone else { return }
+
+        await MainActor.run { isRewriting = true }
+
+        // Ask for a different wording than the current message.
+        // We piggyback on your existing hint and append a rewrite instruction.
+        let baseHint = (lastHint ?? userHint).trimmingCharacters(in: .whitespacesAndNewlines)
+        let rewriteNudge = baseHint.isEmpty
+            ? "Please give a different wording than the previous one."
+            : "\(baseHint) Also generate a different wording than this: '\(editableMessage)'."
+
+        let newBody = await messageVM.generateMessageText(
+            tone: tone,
+            name: lastName,
+            age: lastAge,
+            userHint: rewriteNudge
+        )
+
+        await MainActor.run {
+            editableMessage = newBody
+            isRewriting = false
+        }
+    }
+
+    // MARK: - LLM availability check
 
     private func updateLLMReadyFlag() async {
         if #available(iOS 26.0, *) {
@@ -223,6 +284,7 @@ struct MessageTemplatePickerView: View {
         }
     }
 
+    // MARK: - Helpers for the view
 
     private func sendEditedMessage() {
         guard let contact = currentContact else { return }
@@ -237,6 +299,8 @@ struct MessageTemplatePickerView: View {
             messageVM.lastError = "No valid phone for \(displayName(for: contact))."
             return
         }
+
+        // Set the edited message
         messageVM.composerRecipients = [phone]
         messageVM.composerBody = editableMessage
 
@@ -270,7 +334,6 @@ struct MessageTemplatePickerView: View {
         else {
             return nil
         }
-
         return Calendar.current.dateComponents([.year], from: dob, to: Date()).year
     }
 }
