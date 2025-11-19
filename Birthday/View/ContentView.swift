@@ -128,7 +128,7 @@ struct LandingPage: View {
                                     
                                     // Birthday cards
                                     ForEach(contactsVM.contactsWithBirthday) { contact in
-                                        NavigationLink(destination: editView(contact: contact, contactsVM: contactsVM)) {
+                                        NavigationLink(destination: editView(contact: contact)) {
                                             ModernBirthdayCard(
                                                 contact: contact,
                                                 screenwidth: geometry.size.width
