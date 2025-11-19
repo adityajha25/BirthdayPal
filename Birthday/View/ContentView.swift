@@ -452,10 +452,87 @@ struct EditView: View {
 }
 
 struct addMissingView: View {
-    var contactsVM: ContactViewModel
-    
+    @ObservedObject var contactsVM: ContactViewModel
     var body: some View {
-        
+        GeometryReader { geometry in
+            VStack {
+                Text("Add Mising Birthdays").bold().font(.system(size: 25)).foregroundStyle(.white)
+                ForEach($contactsVM.contacts){ $contact in
+                    if contact.birthday == nil {
+                        addMissingCard(contact: $contact, screenheight: geometry.size.height)
+                    }
+                }
+                if contactsVM.contactsWithoutBirthday.count == 0 {
+                    Text("🎉 No Birthdays Missing 🎉").bold().font(.system(size: 20)).foregroundStyle(.white).padding()
+                }
+                Spacer()
+            }.frame(width: geometry.size.width, height: geometry.size.height).background(Color.black)
+        }
+    }
+}
+
+struct addMissingCard: View {
+    @Binding var contact: Contact
+    var screenheight : CGFloat
+    var phoneNumber: String {
+        contact.phoneNumber ?? ""
+    }
+    @State private var showSheet = false
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(red: 0.1, green: 0.1, blue: 0.1))
+                .frame(height: screenheight * 0.20)
+            HStack {
+                VStack (alignment: .leading){
+                    Text(contact.name).bold().font(.system(size: 25)).foregroundStyle(.white)
+                    Text(phoneNumber).bold().font(.system(size: 20)).foregroundStyle(.gray)
+                    Button(action: {showSheet = true}) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(.gray)
+                                .frame(height: screenheight * 0.05)
+                            Text("🗓️ Add Birthday").foregroundStyle(.white)
+                        }
+                    }.sheet(isPresented: $showSheet) {
+                        addMissingCalendar(contact: $contact)
+                    }
+                }
+                Spacer()
+            }.padding()
+        }.padding()
+    }
+}
+
+struct addMissingCalendar: View {
+    @Binding var contact : Contact
+    @State private var selectedDate = Date()
+    var body: some View {
+        GeometryReader{ geometry in
+            VStack{
+                Text("Add Missing Birthday").bold().font(.system(size: 25)).foregroundStyle(.white)
+                Text("Select a date for \(contact.name)").bold().font(.system(size: 20)).foregroundStyle(.gray)
+                DatePicker("", selection: $selectedDate, displayedComponents: .date)
+                    .datePickerStyle(GraphicalDatePickerStyle())
+                    .background(Color(white: 0.15))
+                    .cornerRadius(16)
+                    .padding()
+                    .colorScheme(.dark)
+                Button(action: {
+                    let components = Calendar.current.dateComponents([.year, .month, .day], from: selectedDate)
+                    contact.birthday = components
+                    
+                }){
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(.gray)
+                            .frame(height: geometry.size.height * 0.05)
+                        Text("Save").foregroundStyle(.white)
+                    }
+                }
+            }.frame(width: geometry.size.width, height: geometry.size.height).background(Color.black)
+
+        }
     }
 }
 
