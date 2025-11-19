@@ -32,110 +32,136 @@ struct MessageTemplatePickerView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color.black.ignoresSafeArea()
+                // Clean blue background
+                Color(red: 0.08, green: 0.12, blue: 0.28)
+                    .ignoresSafeArea()
 
                 if !showEditor {
                     // Template Selection View
-                    VStack(spacing: 20) {
-                        if let contact = currentContact {
-                            // Header
-                            VStack(spacing: 8) {
-                                Text("🎉")
-                                    .font(.system(size: 60))
-                                Text("Send Birthday Message")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                Text("to \(displayName(for: contact))")
-                                    .font(.headline)
-                                    .foregroundColor(.gray)
-                            }
-                            .padding(.top, 40)
-
-                            Spacer()
-
-                            // One-liner hint field
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Add a note (optional)")
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                                // Use iOS 17 multiline TextField so it wraps naturally
-                                if #available(iOS 17.0, *) {
-                                    TextField("e.g. mention our trip, keep it short + funny",
-                                              text: $userHint,
-                                              axis: .vertical)
-                                        .lineLimit(1...3)
-                                        .padding(10)
-                                        .background(Color(white: 0.15))
-                                        .cornerRadius(10)
+                    ScrollView {
+                        VStack(spacing: 24) {
+                            if let contact = currentContact {
+                                // Header
+                                VStack(spacing: 12) {
+                                    Text("🎉")
+                                        .font(.system(size: 60))
+                                    Text("Send Birthday Message")
+                                        .font(.title2)
+                                        .fontWeight(.bold)
                                         .foregroundColor(.white)
-                                } else {
-                                    TextField("e.g. mention our trip, keep it short + funny",
-                                              text: $userHint)
-                                        .padding(10)
-                                        .background(Color(white: 0.15))
-                                        .cornerRadius(10)
-                                        .foregroundColor(.white)
+                                    Text("to \(displayName(for: contact))")
+                                        .font(.headline)
+                                        .foregroundColor(.white.opacity(0.7))
                                 }
-                            }
-                            .padding(.horizontal)
+                                .padding(.top, 40)
 
-                            // Template / Tone options
-                            VStack(spacing: 16) {
-                                Text("Choose a message style:")
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
+                                // One-liner hint field
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Add a note (optional)")
+                                        .font(.subheadline)
+                                        .foregroundColor(.white.opacity(0.7))
+                                    
+                                    // Use iOS 17 multiline TextField so it wraps naturally
+                                    if #available(iOS 17.0, *) {
+                                        TextField("e.g. mention our trip, keep it short + funny",
+                                                  text: $userHint,
+                                                  axis: .vertical)
+                                            .lineLimit(1...3)
+                                            .padding(12)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .fill(Color(red: 0.12, green: 0.16, blue: 0.35).opacity(0.5))
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 12)
+                                                            .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                                                    )
+                                            )
+                                            .foregroundColor(.white)
+                                    } else {
+                                        TextField("e.g. mention our trip, keep it short + funny",
+                                                  text: $userHint)
+                                            .padding(12)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .fill(Color(red: 0.12, green: 0.16, blue: 0.35).opacity(0.5))
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 12)
+                                                            .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                                                    )
+                                            )
+                                            .foregroundColor(.white)
+                                    }
+                                }
+                                .padding(.horizontal, 20)
 
-                                if messageVM.isGenerating {
-                                    ProgressView("Generating…")
-                                        .foregroundColor(.white)
+                                // Template / Tone options
+                                VStack(spacing: 16) {
+                                    Text("Choose a message style:")
+                                        .font(.subheadline)
+                                        .foregroundColor(.white.opacity(0.7))
+
+                                    if messageVM.isGenerating {
+                                        VStack(spacing: 12) {
+                                            ProgressView()
+                                                .tint(.cyan)
+                                            Text("Generating…")
+                                                .foregroundColor(.white.opacity(0.8))
+                                                .font(.subheadline)
+                                        }
                                         .padding()
-                                } else {
-                                    ForEach(MessageTone.allCases) { tone in
-                                        Button(action: {
-                                            selectedTone = tone
-                                            Task {
-                                                await generateMessageForTone(tone, contact: contact)
-                                            }
-                                        }) {
-                                            VStack(alignment: .leading, spacing: 8) {
-                                                HStack {
-                                                    Text(tone.rawValue.capitalized)
-                                                        .font(.headline)
-                                                        .foregroundColor(.white)
-                                                    Spacer()
-                                                    Image(systemName: "chevron.right")
-                                                        .foregroundColor(.gray)
+                                    } else {
+                                        ForEach(MessageTone.allCases) { tone in
+                                            Button(action: {
+                                                selectedTone = tone
+                                                Task {
+                                                    await generateMessageForTone(tone, contact: contact)
                                                 }
+                                            }) {
+                                                VStack(alignment: .leading, spacing: 8) {
+                                                    HStack {
+                                                        Text(tone.rawValue.capitalized)
+                                                            .font(.headline)
+                                                            .foregroundColor(.white)
+                                                        Spacer()
+                                                        Image(systemName: "chevron.right")
+                                                            .foregroundColor(.white.opacity(0.4))
+                                                            .font(.caption)
+                                                    }
 
-                                                // Only show static preview if LLM is NOT ready
-                                                if !llmReady {
-                                                    Text(messagePreview(for: tone, contact: contact))
-                                                        .font(.subheadline)
-                                                        .foregroundColor(.gray)
-                                                        .lineLimit(2)
+                                                    // Only show static preview if LLM is NOT ready
+                                                    if !llmReady {
+                                                        Text(messagePreview(for: tone, contact: contact))
+                                                            .font(.subheadline)
+                                                            .foregroundColor(.white.opacity(0.6))
+                                                            .lineLimit(2)
+                                                    }
                                                 }
+                                                .padding(16)
+                                                .frame(maxWidth: .infinity)
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: 12)
+                                                        .fill(Color(red: 0.12, green: 0.16, blue: 0.35).opacity(0.5))
+                                                        .overlay(
+                                                            RoundedRectangle(cornerRadius: 12)
+                                                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                                        )
+                                                )
                                             }
-                                            .padding()
-                                            .frame(maxWidth: .infinity)
-                                            .background(Color(white: 0.15))
-                                            .cornerRadius(12)
                                         }
                                     }
                                 }
-                            }
-                            .padding(.horizontal)
+                                .padding(.horizontal, 20)
 
-                            Spacer()
-
-                            Button("Cancel") {
-                                dismiss()
+                                Button("Cancel") {
+                                    dismiss()
+                                }
+                                .foregroundColor(.white.opacity(0.6))
+                                .padding(.bottom, 20)
+                                .padding(.top, 12)
+                            } else {
+                                Text("No contact selected")
+                                    .foregroundColor(.white.opacity(0.6))
                             }
-                            .foregroundColor(.gray)
-                            .padding(.bottom, 20)
-                        } else {
-                            Text("No contact selected")
-                                .foregroundColor(.gray)
                         }
                     }
                 } else {
@@ -146,7 +172,7 @@ struct MessageTemplatePickerView: View {
                             Button("Back") {
                                 showEditor = false
                             }
-                            .foregroundColor(.blue)
+                            .foregroundColor(.cyan)
 
                             Spacer()
 
@@ -159,18 +185,18 @@ struct MessageTemplatePickerView: View {
                             // REWRITE button
                             if isRewriting {
                                 ProgressView()
-                                    .tint(.blue)
+                                    .tint(.cyan)
                             } else {
                                 Button("Rewrite") {
                                     Task { await rewriteMessage() }
                                 }
-                                .foregroundColor(.blue)
+                                .foregroundColor(.cyan)
                             }
 
                             Button("Send") {
                                 sendEditedMessage()
                             }
-                            .foregroundColor(.blue)
+                            .foregroundColor(.cyan)
                             .bold()
                         }
                         .padding(.horizontal)
@@ -180,14 +206,20 @@ struct MessageTemplatePickerView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Preview:")
                                 .font(.subheadline)
-                                .foregroundColor(.gray)
+                                .foregroundColor(.white.opacity(0.7))
                                 .padding(.horizontal)
 
                             TextEditor(text: $editableMessage)
                                 .frame(minHeight: 150)
                                 .padding(12)
-                                .background(Color(white: 0.15))
-                                .cornerRadius(12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color(red: 0.12, green: 0.16, blue: 0.35).opacity(0.5))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                                        )
+                                )
                                 .foregroundColor(.white)
                                 .font(.body)
                                 .scrollContentBackground(.hidden)
@@ -196,7 +228,7 @@ struct MessageTemplatePickerView: View {
 
                         Text("Edit the message before sending")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(.white.opacity(0.6))
 
                         Spacer()
                     }
