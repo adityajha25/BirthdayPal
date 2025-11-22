@@ -12,3 +12,7 @@
 - 🖼 SwiftUI
 - 🧩 WidgetKit
 - 🤖 Apple Foundation Models
+
+## Pitch Video
+
+[Watch the pitch video](https://www.youtube.com/watch?v=eJ7s6XHZhao)
