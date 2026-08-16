@@ -129,6 +129,7 @@ struct SettingsView: View {
 
             Button {
                 contactsVM.loadContacts(force: true)
+                contactsVM.loadMissingBirthdayContactsIfNeeded(force: true)
             } label: {
                 settingsRow(
                     icon: "arrow.clockwise",

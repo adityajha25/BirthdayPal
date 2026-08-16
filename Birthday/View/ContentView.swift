@@ -22,6 +22,7 @@ struct LandingPage: View {
         case addMissing
         case edit(String)
         case settings
+        case todaysBirthdays
     }
 
     var body: some View {
@@ -70,7 +71,7 @@ struct LandingPage: View {
                         ScrollView(showsIndicators: false) {
                             VStack(spacing: 28) {
                                 // Top 3 Birthdays - Horizontal Scroll
-                                if contactsVM.isLoading {
+                                if contactsVM.isLoadingBirthdays {
                                     VStack(spacing: 16) {
                                         ProgressView()
                                             .tint(.white)
@@ -134,15 +135,15 @@ struct LandingPage: View {
                                                 .fontWeight(.bold)
                                                 .foregroundStyle(.white)
                                             Spacer()
-                                            Text("\(min(contactsVM.contactsWithBirthday.count, 3)) of \(contactsVM.contactsWithBirthday.count)")
+                                            Text("\(contactsVM.upcomingPreview.count) of \(contactsVM.contactsWithBirthday.count)")
                                                 .font(.subheadline)
                                                 .foregroundStyle(.white.opacity(0.6))
                                         }
                                         .padding(.horizontal, 24)
                                         
                                         ScrollView(.horizontal, showsIndicators: false) {
-                                            HStack(spacing: 16) {
-                                                ForEach(Array(contactsVM.contactsWithBirthday.prefix(3))) { contact in
+                                            LazyHStack(spacing: 16) {
+                                                ForEach(contactsVM.upcomingPreview) { contact in
                                                     Button {
                                                         path.append(Route.edit(contact.id))
                                                     } label: {
@@ -159,6 +160,22 @@ struct LandingPage: View {
                                 // Achievement Card
                                 AchievementCardView(rememberedCount: contactsVM.rememberedBirthdaysCount)
                                     .padding(.horizontal, 20)
+                                
+                                // Today's Birthdays
+                                Button {
+                                    path.append(Route.todaysBirthdays)
+                                } label: {
+                                    ActionCard(
+                                        icon: "birthday.cake.fill",
+                                        title: "Today's Birthdays",
+                                        subtitle: contactsVM.todaysBirthdays.isEmpty
+                                            ? "No birthdays today"
+                                            : "\(contactsVM.todaysBirthdays.count) today — send a message",
+                                        gradientColors: [Color.orange, Color.pink]
+                                    )
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                .padding(.horizontal, 20)
                                 
                                 // Browse Birthdays Button
                                 Button {
@@ -201,7 +218,7 @@ struct LandingPage: View {
                 case .addMissing:
                     addMissingView(contactsVM: contactsVM)
                 case .edit(let contactID):
-                    if let contact = contactsVM.contacts.first(where: { $0.id == contactID }) {
+                    if let contact = contactsVM.contact(withId: contactID) {
                         EditView(contact: contact, contactsVM: contactsVM)
                     } else {
                         Text("Contact not found")
@@ -209,6 +226,10 @@ struct LandingPage: View {
                     }
                 case .settings:
                     SettingsView(contactsVM: contactsVM)
+                case .todaysBirthdays:
+                    TodaysBirthdaysView(contactsVM: contactsVM) { contactID in
+                        path.append(Route.edit(contactID))
+                    }
                 }
             }
         }
@@ -216,6 +237,106 @@ struct LandingPage: View {
         .task {
             contactsVM.loadContacts()
             BirthdayNotificationManager.shared.requestAuthorizationIfNeeded()
+            applyPendingDeepLinkIfNeeded()
+        }
+        .onOpenURL { url in
+            handleDeepLink(url)
+        }
+        .onAppear {
+            applyPendingDeepLinkIfNeeded()
+        }
+    }
+
+    private func handleDeepLink(_ url: URL) {
+        guard let link = DeepLink.from(url: url) else { return }
+        navigate(to: link)
+    }
+
+    private func applyPendingDeepLinkIfNeeded() {
+        guard let link = DeepLink.consumePending() else { return }
+        navigate(to: link)
+    }
+
+    private func navigate(to link: DeepLink) {
+        switch link {
+        case .todaysBirthdays:
+            path = NavigationPath()
+            path.append(Route.todaysBirthdays)
+        }
+    }
+}
+
+// MARK: - Today's Birthdays
+
+@available(iOS 17.0, *)
+struct TodaysBirthdaysView: View {
+    @ObservedObject var contactsVM: ContactViewModel
+    var onSelectContact: (String) -> Void
+
+    var body: some View {
+        ZStack {
+            Color(red: 0.08, green: 0.12, blue: 0.28)
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Today's Birthdays", systemImage: "birthday.cake.fill")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.white)
+                        Text(Date().formattedDate())
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 20)
+
+                    if contactsVM.isLoadingBirthdays {
+                        ProgressView()
+                            .tint(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 40)
+                    } else if contactsVM.todaysBirthdays.isEmpty {
+                        GlassCard {
+                            VStack(spacing: 16) {
+                                Image(systemName: "calendar")
+                                    .font(.system(size: 44))
+                                    .foregroundStyle(.cyan)
+                                Text("No birthdays today")
+                                    .font(.title3)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(.white)
+                                Text("Check back tomorrow, or browse upcoming birthdays from Home.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.white.opacity(0.7))
+                                    .multilineTextAlignment(.center)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(28)
+                        }
+                        .padding(.horizontal, 20)
+                    } else {
+                        Text("\(contactsVM.todaysBirthdays.count) celebration\(contactsVM.todaysBirthdays.count == 1 ? "" : "s") today")
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.7))
+                            .padding(.horizontal, 24)
+
+                        LazyVStack(spacing: 16) {
+                            ForEach(contactsVM.todaysBirthdays) { contact in
+                                Button {
+                                    onSelectContact(contact.id)
+                                } label: {
+                                    BdayCard(contact: contact)
+                                }
+                                .buttonStyle(.plain)
+                                .padding(.horizontal, 20)
+                            }
+                        }
+                    }
+                }
+                .padding(.bottom, 32)
+            }
         }
     }
 }
@@ -715,19 +836,14 @@ struct addMissingView: View {
     @ObservedObject var contactsVM: ContactViewModel
     @State private var editingContactID: String?
     @State private var showDateSheet = false
-    
-    private var missingIndices: [Int] {
-        contactsVM.contacts.indices.filter { contactsVM.contacts[$0].birthday == nil }
-    }
-    
+
     var body: some View {
         ZStack {
-            // Simple solid background
             Color(red: 0.08, green: 0.12, blue: 0.28)
                 .ignoresSafeArea()
-            
+
             ScrollView {
-                VStack(spacing: 20) {
+                LazyVStack(spacing: 20) {
                     VStack(spacing: 10) {
                         Image(systemName: "person.crop.circle.badge.plus")
                             .font(.system(size: 40))
@@ -738,15 +854,12 @@ struct addMissingView: View {
                             .foregroundStyle(.white)
                     }
                     .padding(.top, 20)
-                    
-                    ForEach(missingIndices, id: \.self) { index in
-                        addMissingCard(contact: contactsVM.contacts[index]) {
-                            editingContactID = contactsVM.contacts[index].id
-                            showDateSheet = true
-                        }
-                    }
-                    
-                    if missingIndices.isEmpty {
+
+                    if contactsVM.isLoadingMissing && contactsVM.contactsWithoutBirthday.isEmpty {
+                        ProgressView()
+                            .tint(.white)
+                            .padding(.top, 40)
+                    } else if contactsVM.contactsWithoutBirthday.isEmpty {
                         GlassCard {
                             VStack(spacing: 16) {
                                 Image(systemName: "checkmark.seal.fill")
@@ -763,15 +876,28 @@ struct addMissingView: View {
                             .padding(32)
                         }
                         .padding(.horizontal, 20)
+                    } else {
+                        ForEach(contactsVM.contactsWithoutBirthday) { contact in
+                            addMissingCard(contact: contact) {
+                                editingContactID = contact.id
+                                showDateSheet = true
+                            }
+                        }
                     }
                 }
                 .padding(.bottom, 24)
             }
         }
+        .task {
+            contactsVM.loadMissingBirthdayContactsIfNeeded()
+        }
         .sheet(isPresented: $showDateSheet) {
-            if let editingContactID,
-               let index = contactsVM.contacts.firstIndex(where: { $0.id == editingContactID }) {
-                addMissingCalendar(contact: $contactsVM.contacts[index])
+            if let editingContactID {
+                addMissingCalendar(
+                    contactName: contactsVM.contact(withId: editingContactID)?.name ?? "Contact",
+                    contactID: editingContactID,
+                    contactsVM: contactsVM
+                )
             }
         }
     }
@@ -780,11 +906,11 @@ struct addMissingView: View {
 struct addMissingCard: View {
     let contact: Contact
     let onAddBirthday: () -> Void
-    
+
     var phoneNumber: String {
         contact.phoneNumber ?? "No phone number"
     }
-    
+
     var body: some View {
         GlassCard(intensity: .strong) {
             HStack(spacing: 20) {
@@ -793,11 +919,11 @@ struct addMissingCard: View {
                         .font(.title3)
                         .fontWeight(.bold)
                         .foregroundStyle(.white)
-                    
+
                     Text(phoneNumber)
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.6))
-                    
+
                     Button(action: onAddBirthday) {
                         HStack(spacing: 10) {
                             Image(systemName: "calendar.badge.plus")
@@ -828,16 +954,17 @@ struct addMissingCard: View {
 }
 
 struct addMissingCalendar: View {
-    @Binding var contact: Contact
+    let contactName: String
+    let contactID: String
+    @ObservedObject var contactsVM: ContactViewModel
     @State private var selectedDate = Date()
     @Environment(\.dismiss) var dismiss
-    
+
     var body: some View {
         ZStack {
-            // Simple solid background
             Color(red: 0.08, green: 0.12, blue: 0.28)
                 .ignoresSafeArea()
-            
+
             VStack(spacing: 24) {
                 VStack(spacing: 8) {
                     Image(systemName: "calendar.badge.plus")
@@ -847,13 +974,13 @@ struct addMissingCalendar: View {
                         .font(.title)
                         .fontWeight(.bold)
                         .foregroundStyle(.white)
-                    
-                    Text("Select a date for \(contact.name)")
+
+                    Text("Select a date for \(contactName)")
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.7))
                 }
                 .padding(.top, 40)
-                
+
                 GlassCard(intensity: .strong) {
                     DatePicker("", selection: $selectedDate, displayedComponents: .date)
                         .datePickerStyle(GraphicalDatePickerStyle())
@@ -862,12 +989,12 @@ struct addMissingCalendar: View {
                         .padding(20)
                 }
                 .padding(.horizontal, 20)
-                
+
                 Spacer()
-                
+
                 Button(action: {
                     let components = Calendar.current.dateComponents([.year, .month, .day], from: selectedDate)
-                    contact.birthday = components
+                    contactsVM.assignBirthday(contactID: contactID, components: components)
                     dismiss()
                 }) {
                     HStack(spacing: 12) {
@@ -1018,8 +1145,10 @@ struct ByMonthView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 24)
 
-                ForEach(contactsVM.contactsPerMonth(monthName: selectedMonth)) { contact in
-                    monthCard(contact: contact)
+                LazyVStack(spacing: 16) {
+                    ForEach(contactsVM.contactsPerMonth(monthName: selectedMonth)) { contact in
+                        monthCard(contact: contact)
+                    }
                 }
             }
         }
@@ -1100,8 +1229,10 @@ struct CalendarView: View {
                     .font(.subheadline)
                     .padding(.horizontal, 24)
 
-                ForEach(contactsVM.contactsPerDate(date: selectedDate)) { contact in
-                    calendarCard(contact: contact)
+                LazyVStack(spacing: 12) {
+                    ForEach(contactsVM.contactsPerDate(date: selectedDate)) { contact in
+                        calendarCard(contact: contact)
+                    }
                 }
                 
                 if contactsVM.contactsPerDate(date: selectedDate).isEmpty {
