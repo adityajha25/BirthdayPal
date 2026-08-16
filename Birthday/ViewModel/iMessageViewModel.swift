@@ -22,6 +22,8 @@ final class ContactViewModel: ObservableObject {
 
     // MARK: - Private
     private let contactsManager = ContactsManager()
+    private var hasCompletedInitialLoad = false
+    private var isFetchInFlight = false
 
     // MARK: - Init / Deinit
     init(contacts: [Contact] = []) {
@@ -42,36 +44,50 @@ final class ContactViewModel: ObservableObject {
     }
 
     // MARK: - Loading contacts
-    func loadContacts() {
-        isLoading = true
+    /// Loads contacts once on launch. Pass `force: true` to refresh from the address book.
+    func loadContacts(force: Bool = false) {
+        if isFetchInFlight { return }
+        if hasCompletedInitialLoad && !force { return }
+
+        isFetchInFlight = true
+        // Only show the full-screen loader on the first empty load — avoids
+        // wiping the home screen (and triggering NavigationLink bugs) on return.
+        if contacts.isEmpty {
+            isLoading = true
+        }
         errorMessage = nil
 
         contactsManager.fetchContactsSortedByBirthday { [weak self] result in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.isLoading = false
+            guard let self else { return }
+            self.isFetchInFlight = false
+            self.isLoading = false
+            self.hasCompletedInitialLoad = true
 
-                switch result {
-                case .success(let fetchedContacts):
-                    self.contacts = fetchedContacts
+            switch result {
+            case .success(let fetchedContacts):
+                self.contacts = fetchedContacts
 
-                    // 🔔 Ask notification permission if needed (only prompts once)
-                    BirthdayNotificationManager.shared.requestAuthorizationIfNeeded()
+                // 🔔 Ask notification permission if needed (only prompts once)
+                BirthdayNotificationManager.shared.requestAuthorizationIfNeeded()
 
-                    // 🔔 Schedule *today’s* birthday alerts at 9:00 (idempotent; safe to call daily)
+                // 🔔 Schedule today’s birthday alerts at the user’s chosen time
+                let settings = AppSettings.shared
+                if settings.notificationsEnabled {
                     BirthdayNotificationManager.shared.refreshDailySchedule(
                         contacts: self.contactsWithBirthday,
-                        fireHour: 9,
-                        fireMinute: 0
+                        fireHour: settings.notificationHour,
+                        fireMinute: settings.notificationMinute
                     )
-
-                    // 🔁 Update widget data
-                    self.updateWidgetData()
-
-                case .failure(let error):
-                    self.errorMessage = error.localizedDescription
-                    print("Error fetching contacts: \(error)")
+                } else {
+                    BirthdayNotificationManager.shared.clearAllBirthdayNotifications()
                 }
+
+                // 🔁 Update widget data
+                self.updateWidgetData()
+
+            case .failure(let error):
+                self.errorMessage = error.localizedDescription
+                print("Error fetching contacts: \(error)")
             }
         }
     }
@@ -135,14 +151,13 @@ final class ContactViewModel: ObservableObject {
 
     // MARK: - Filtering helpers
     func contactsPerDate(date: Date) -> [Contact] {
-        let calendar = Calendar.current
-        let targetMonth = calendar.component(.month, from: date)
-        let targetDay = calendar.component(.day, from: date)
-
-        return contactsWithBirthday.filter {
-            guard let birthday = $0.birthday else { return false }
-            return birthday.month == targetMonth && birthday.day == targetDay
-        }
+        contactsWithBirthday.filter { $0.isObserved(on: date) }
+    }
+    
+    /// True when any contact observes a birthday on this date (for calendar dots).
+    func hasBirthday(on dateComponents: DateComponents) -> Bool {
+        guard let date = Calendar.current.date(from: dateComponents) else { return false }
+        return contactsWithBirthday.contains { $0.isObserved(on: date) }
     }
 
     func contactsPerMonth(monthName: String) -> [Contact] {

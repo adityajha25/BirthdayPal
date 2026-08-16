@@ -95,6 +95,12 @@ final class BirthdayNotificationManager {
             let ours = requests.map(\.identifier).filter { $0.hasPrefix(self.idPrefix) }
             UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ours)
         }
+        UserDefaults.standard.removeObject(forKey: lastScheduledKey)
+    }
+
+    /// Clears the "already scheduled today" marker so the next refresh re-creates triggers (e.g. after time change).
+    func invalidateDailyScheduleMarker() {
+        UserDefaults.standard.removeObject(forKey: lastScheduledKey)
     }
 
     /// Debug print

@@ -50,11 +50,10 @@ final class NotificationsManager: NSObject, UNUserNotificationCenterDelegate {
             center.removePendingNotificationRequests(withIdentifiers: toRemove)
 
             for contact in contacts {
-                guard
-                    let comps = contact.birthday,
-                    let month = comps.month,
-                    let day = comps.day
-                else { continue }
+                // Feb 29 birthdays notify on Feb 28 so the trigger exists every year
+                guard let monthDay = contact.notificationMonthDay else { continue }
+                let month = monthDay.month
+                let day = monthDay.day
 
                 // Stable identifier per contact (adjust if your Contact has a real `id`)
                 let baseID = "bday.\(self.identifierKey(for: contact))"
@@ -77,9 +76,9 @@ final class NotificationsManager: NSObject, UNUserNotificationCenterDelegate {
                 let request = UNNotificationRequest(identifier: baseID, content: content, trigger: trigger)
                 center.add(request)
 
-                // If their birthday is TODAY and the scheduled time already passed,
+                // If their observed birthday is TODAY and the scheduled time already passed,
                 // also fire a one-off notification immediately so you don’t miss it.
-                if self.isToday(month: month, day: day) && self.hasTodayTimePassed(hour: fireHour, minute: fireMinute) {
+                if contact.daysToBirthday == 0 && self.hasTodayTimePassed(hour: fireHour, minute: fireMinute) {
                     let instant = UNTimeIntervalNotificationTrigger(timeInterval: 10, repeats: false)
                     let nowRequest = UNNotificationRequest(
                         identifier: baseID + ".now",
@@ -100,11 +99,6 @@ final class NotificationsManager: NSObject, UNUserNotificationCenterDelegate {
         let m = contact.birthday?.month ?? 0
         let d = contact.birthday?.day ?? 0
         return "\(contact.name)|\(m)-\(d)"
-    }
-
-    private func isToday(month: Int, day: Int) -> Bool {
-        let today = Calendar.current.dateComponents([.month, .day], from: Date())
-        return today.month == month && today.day == day
     }
 
     private func hasTodayTimePassed(hour: Int, minute: Int) -> Bool {

@@ -9,34 +9,102 @@ import Contacts
 import Combine
 
 /// Represents a contact with essential information
-struct Contact: Identifiable {
-    let id = UUID()
+struct Contact: Identifiable, Hashable {
+    let id: String
     let name: String
     let phoneNumber: String?
     var birthday: DateComponents?
     
-    /// Returns a comparable date for sorting purposes
-    /// Converts birthday to a date in the current year for comparison
+    init(id: String, name: String, phoneNumber: String?, birthday: DateComponents?) {
+        self.id = id
+        self.name = name
+        self.phoneNumber = phoneNumber
+        self.birthday = birthday
+    }
+    
+    /// Next date this birthday is observed (Feb 29 → Feb 28 in non-leap years).
     var comparableBirthday: Date? {
-        guard let birthday = birthday else { return nil }
-        
-        let calendar = Calendar.current
-        let currentYear = calendar.component(.year, from: Date())
-        
-        var dateComponents = DateComponents()
-        dateComponents.year = currentYear
-        dateComponents.month = birthday.month
-        dateComponents.day = birthday.day
-        
-        return calendar.date(from: dateComponents)
+        nextObservanceDate()
     }
     
     var daysToBirthday: Int? {
-        guard let nextBirthdayDate = comparableBirthday?.nextBirthday() else { return nil }
+        guard let nextBirthdayDate = nextObservanceDate() else { return nil }
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        let days = calendar.dateComponents([.day], from: today, to: nextBirthdayDate).day
-        return days
+        return calendar.dateComponents([.day], from: today, to: nextBirthdayDate).day
+    }
+    
+    /// Age the person will turn on their next birthday. `nil` when birth year is unknown.
+    var ageTurning: Int? {
+        guard let birthYear = birthday?.year,
+              let next = nextObservanceDate() else { return nil }
+        let nextYear = Calendar.current.component(.year, from: next)
+        let age = nextYear - birthYear
+        return age > 0 ? age : nil
+    }
+    
+    /// Month/day for display badges (uses a leap year so Feb 29 always formats).
+    var displayBirthdayDate: Date? {
+        guard let month = birthday?.month, let day = birthday?.day else { return nil }
+        var comps = DateComponents()
+        comps.year = 2024 // leap year — keeps Feb 29 valid for display
+        comps.month = month
+        comps.day = day
+        return Calendar.current.date(from: comps)
+    }
+    
+    /// Whether this contact's birthday is observed on the given calendar day.
+    func isObserved(on date: Date, calendar: Calendar = .current) -> Bool {
+        guard let observance = observanceDate(
+            in: calendar.component(.year, from: date),
+            calendar: calendar
+        ) else { return false }
+        return calendar.isDate(observance, inSameDayAs: date)
+    }
+    
+    /// Observed celebration date in a specific year.
+    /// Leap-day birthdays fall on Feb 28 in non-leap years.
+    func observanceDate(in year: Int, calendar: Calendar = .current) -> Date? {
+        guard let month = birthday?.month, let day = birthday?.day else { return nil }
+        var adjustedDay = day
+        if month == 2 && day == 29 && !Self.isLeapYear(year, calendar: calendar) {
+            adjustedDay = 28
+        }
+        var comps = DateComponents()
+        comps.year = year
+        comps.month = month
+        comps.day = adjustedDay
+        return calendar.date(from: comps)
+    }
+    
+    func nextObservanceDate(from reference: Date = Date(), calendar: Calendar = .current) -> Date? {
+        guard birthday?.month != nil, birthday?.day != nil else { return nil }
+        let today = calendar.startOfDay(for: reference)
+        let year = calendar.component(.year, from: today)
+        
+        if let thisYear = observanceDate(in: year, calendar: calendar),
+           calendar.startOfDay(for: thisYear) >= today {
+            return calendar.startOfDay(for: thisYear)
+        }
+        guard let nextYear = observanceDate(in: year + 1, calendar: calendar) else { return nil }
+        return calendar.startOfDay(for: nextYear)
+    }
+    
+    /// Month/day used for repeating calendar notifications (Feb 29 → 28 so it fires yearly).
+    var notificationMonthDay: (month: Int, day: Int)? {
+        guard let month = birthday?.month, let day = birthday?.day else { return nil }
+        if month == 2 && day == 29 {
+            return (2, 28)
+        }
+        return (month, day)
+    }
+    
+    static func isLeapYear(_ year: Int, calendar: Calendar = .current) -> Bool {
+        var comps = DateComponents()
+        comps.year = year
+        comps.month = 2
+        comps.day = 29
+        return calendar.date(from: comps) != nil
     }
 }
 
@@ -67,8 +135,8 @@ class ContactsManager {
             // Move to background thread
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    let contacts = try self.getAllContacts()
-                    let sortedContacts = self.mergeSortByBirthday(contacts)
+                    let contacts = try self.performContactsEnumeration()
+                    let sortedContacts = contacts.sorted { self.shouldPlaceFirst($0, before: $1) }
                     DispatchQueue.main.async {
                         completion(.success(sortedContacts))
                     }
@@ -78,37 +146,6 @@ class ContactsManager {
                     }
                 }
             }
-        }
-    }
-    
-    /// Fetches all contacts from the device
-    /// - Returns: Array of Contact structs
-    private func getAllContacts() throws -> [Contact] {
-        // Ensure we never enumerate contacts on the main thread
-        if Thread.isMainThread {
-            // Perform the enumeration synchronously on a background queue
-            var result: Result<[Contact], Error> = .success([])
-            let group = DispatchGroup()
-            group.enter()
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    let contacts = try self.performContactsEnumeration()
-                    result = .success(contacts)
-                } catch {
-                    result = .failure(error)
-                }
-                group.leave()
-            }
-            group.wait()
-            switch result {
-            case .success(let contacts):
-                return contacts
-            case .failure(let error):
-                throw error
-            }
-        } else {
-            // Already off the main thread – enumerate directly
-            return try self.performContactsEnumeration()
         }
     }
     
@@ -126,98 +163,33 @@ class ContactsManager {
             let name = "\(cnContact.givenName) \(cnContact.familyName)".trimmingCharacters(in: .whitespaces)
             let phoneNumber = cnContact.phoneNumbers.first?.value.stringValue
             let birthday = cnContact.birthday
-            let contact = Contact(name: name.isEmpty ? "No Name" : name,
-                                  phoneNumber: phoneNumber,
-                                  birthday: birthday)
+            let contact = Contact(
+                id: cnContact.identifier,
+                name: name.isEmpty ? "No Name" : name,
+                phoneNumber: phoneNumber,
+                birthday: birthday
+            )
             contacts.append(contact)
         }
         return contacts
     }
     
-    /// Sorts contacts by birthday using merge sort algorithm
-    /// Contacts without birthdays are placed at the end
-    /// - Parameter contacts: Array of contacts to sort
-    /// - Returns: Sorted array of contacts
-    func mergeSortByBirthday(_ contacts: [Contact]) -> [Contact] {
-        guard contacts.count > 1 else { return contacts }
-        
-        let middleIndex = contacts.count / 2
-        let leftArray = Array(contacts[0..<middleIndex])
-        let rightArray = Array(contacts[middleIndex..<contacts.count])
-        
-        return merge(
-            left: mergeSortByBirthday(leftArray),
-            right: mergeSortByBirthday(rightArray)
-        )
-    }
-    
-    /// Merges two sorted arrays into one sorted array
-    /// - Parameters:
-    ///   - left: Left sorted array
-    ///   - right: Right sorted array
-    /// - Returns: Merged sorted array
-    private func merge(left: [Contact], right: [Contact]) -> [Contact] {
-        var leftIndex = 0
-        var rightIndex = 0
-        var result: [Contact] = []
-        
-        // Merge while both arrays have elements
-        while leftIndex < left.count && rightIndex < right.count {
-            let leftContact = left[leftIndex]
-            let rightContact = right[rightIndex]
-            
-            // Contacts with birthdays come before those without
-            if shouldPlaceFirst(leftContact, before: rightContact) {
-                result.append(leftContact)
-                leftIndex += 1
-            } else {
-                result.append(rightContact)
-                rightIndex += 1
-            }
-        }
-        
-        // Append remaining elements
-        while leftIndex < left.count {
-            result.append(left[leftIndex])
-            leftIndex += 1
-        }
-        
-        while rightIndex < right.count {
-            result.append(right[rightIndex])
-            rightIndex += 1
-        }
-        
-        return result
-    }
-    
-    /// Determines if first contact should be placed before second contact
-    /// - Parameters:
-    ///   - first: First contact
-    ///   - second: Second contact
-    /// - Returns: True if first should come before second
+    /// Contacts with an upcoming birthday come first, ordered by next observance date.
     private func shouldPlaceFirst(_ first: Contact, before second: Contact) -> Bool {
         let firstDate = first.comparableBirthday
         let secondDate = second.comparableBirthday
         
-        // If both have birthdays, compare dates
         if let firstDate = firstDate, let secondDate = secondDate {
             return firstDate < secondDate
         }
-        
-        // Contacts with birthdays come before those without
         if firstDate != nil && secondDate == nil {
             return true
         }
-        
         if firstDate == nil && secondDate != nil {
             return false
         }
-        
-        // If neither has a birthday, maintain original order
         return true
     }
-    
-    
 }
 
 extension Date {
