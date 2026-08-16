@@ -68,15 +68,15 @@ struct RememberedBirthdaysWidgetView: View {
             Spacer()
 
             if entry.data.rememberedCount == 0 {
-                Text("Start sending messages 🎉")
+                Label("Start sending messages", systemImage: "message.fill")
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.6))
             } else if entry.data.rememberedCount < 10 {
-                Text("Nice start – keep going! 🎂")
+                Label("Nice start – keep going!", systemImage: "birthday.cake.fill")
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.6))
             } else {
-                Text("You're a birthday pro 🥳")
+                Label("You're a birthday pro", systemImage: "star.fill")
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.6))
             }
@@ -96,8 +96,9 @@ struct UpcomingBirthdayWidgetView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
-                Text("🎂")
+                Image(systemName: "birthday.cake.fill")
                     .font(.caption)
+                    .foregroundColor(.cyan)
                 Text("Upcoming Birthday")
                     .font(.caption)
                     .fontWeight(.medium)

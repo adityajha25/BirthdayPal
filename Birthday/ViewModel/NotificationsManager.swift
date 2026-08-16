@@ -68,7 +68,7 @@ final class NotificationsManager: NSObject, UNUserNotificationCenterDelegate {
                 let trigger = UNCalendarNotificationTrigger(dateMatching: triggerComps, repeats: true)
 
                 let content = UNMutableNotificationContent()
-                content.title = "🎂 It’s \(contact.name)’s birthday!"
+                content.title = "It’s \(contact.name)’s birthday!"
                 content.body = "Send them a quick message."
                 content.sound = .default
                 content.threadIdentifier = "birthday"

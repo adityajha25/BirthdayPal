@@ -36,6 +36,9 @@ struct LandingPage: View {
                         // Header - Center Aligned
                         ZStack(alignment: .trailing) {
                             VStack(spacing: 8) {
+                                Image(systemName: "birthday.cake.fill")
+                                    .font(.system(size: 34))
+                                    .foregroundStyle(.cyan)
                                 Text("BirthdayPal")
                                     .foregroundStyle(.white)
                                     .font(.system(size: 36, weight: .bold))
@@ -126,7 +129,7 @@ struct LandingPage: View {
                                 } else {
                                     VStack(alignment: .leading, spacing: 12) {
                                         HStack {
-                                            Text("Coming Up")
+                                            Label("Coming Up", systemImage: "clock.badge.checkmark")
                                                 .font(.title2)
                                                 .fontWeight(.bold)
                                                 .foregroundStyle(.white)
@@ -448,9 +451,9 @@ struct AchievementCardView: View {
 
                 Spacer()
 
-                // Decorative element
-                Text("🎉")
-                    .font(.system(size: 50))
+                Image(systemName: "party.popper.fill")
+                    .font(.system(size: 44))
+                    .foregroundStyle(.yellow)
                     .padding(.trailing, 24)
             }
         }
@@ -570,6 +573,9 @@ struct EditView: View {
             VStack(spacing: 32) {
                 // Header
                 VStack(spacing: 8) {
+                    Image(systemName: "message.fill")
+                        .font(.system(size: 36))
+                        .foregroundStyle(.cyan)
                     Text("Send Birthday Message")
                         .font(.largeTitle)
                         .fontWeight(.bold)
@@ -585,8 +591,9 @@ struct EditView: View {
                 if let birthday = contact.birthday {
                     GlassCard {
                         VStack(spacing: 16) {
-                            Text("🎂")
-                                .font(.system(size: 60))
+                            Image(systemName: "birthday.cake.fill")
+                                .font(.system(size: 56))
+                                .foregroundStyle(.cyan)
                             
                             Text(formatBirthday(birthday))
                                 .font(.title2)
@@ -721,11 +728,16 @@ struct addMissingView: View {
             
             ScrollView {
                 VStack(spacing: 20) {
-                    Text("Add Missing Birthdays")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
-                        .padding(.top, 20)
+                    VStack(spacing: 10) {
+                        Image(systemName: "person.crop.circle.badge.plus")
+                            .font(.system(size: 40))
+                            .foregroundStyle(.cyan)
+                        Text("Add Missing Birthdays")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.white)
+                    }
+                    .padding(.top, 20)
                     
                     ForEach(missingIndices, id: \.self) { index in
                         addMissingCard(contact: contactsVM.contacts[index]) {
@@ -737,8 +749,9 @@ struct addMissingView: View {
                     if missingIndices.isEmpty {
                         GlassCard {
                             VStack(spacing: 16) {
-                                Text("🎉")
-                                    .font(.system(size: 60))
+                                Image(systemName: "checkmark.seal.fill")
+                                    .font(.system(size: 52))
+                                    .foregroundStyle(.cyan)
                                 Text("No Birthdays Missing!")
                                     .font(.title2)
                                     .fontWeight(.bold)
@@ -827,6 +840,9 @@ struct addMissingCalendar: View {
             
             VStack(spacing: 24) {
                 VStack(spacing: 8) {
+                    Image(systemName: "calendar.badge.plus")
+                        .font(.system(size: 40))
+                        .foregroundStyle(.cyan)
                     Text("Add Missing Birthday")
                         .font(.title)
                         .fontWeight(.bold)
@@ -899,10 +915,11 @@ struct BrowseBirthdaysView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Browse Birthdays")
+                        Label("Browse Birthdays", systemImage: "calendar")
                             .font(.largeTitle)
                             .fontWeight(.bold)
                             .foregroundStyle(.white)
+                            .labelStyle(.titleAndIcon)
                         Text("View by month or calendar")
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.7))
@@ -917,7 +934,7 @@ struct BrowseBirthdaysView: View {
                                 selectedTab = .byMonth
                             }
                         }) {
-                            Text("By Month")
+                            Label("By Month", systemImage: "list.bullet")
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
                                 .foregroundColor(.white)
@@ -938,7 +955,7 @@ struct BrowseBirthdaysView: View {
                                 selectedTab = .calendar
                             }
                         }) {
-                            Text("Calendar")
+                            Label("Calendar", systemImage: "calendar")
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
                                 .foregroundColor(.white)
@@ -978,7 +995,7 @@ struct ByMonthView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Select Month")
+                Label("Select Month", systemImage: "calendar")
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.7))
                     .padding(.horizontal, 24)

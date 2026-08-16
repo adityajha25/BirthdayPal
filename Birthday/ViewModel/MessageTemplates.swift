@@ -10,6 +10,15 @@ import Foundation
 enum MessageTone: String, CaseIterable, Identifiable {
     case formal, casual, funny, romantic
     var id: String { rawValue }
+
+    var systemImage: String {
+        switch self {
+        case .formal: return "text.book.closed.fill"
+        case .casual: return "bubble.left.fill"
+        case .funny: return "face.smiling.fill"
+        case .romantic: return "heart.fill"
+        }
+    }
 }
 
 

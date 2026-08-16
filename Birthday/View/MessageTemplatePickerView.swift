@@ -43,8 +43,9 @@ struct MessageTemplatePickerView: View {
                             if let contact = currentContact {
                                 // Header
                                 VStack(spacing: 12) {
-                                    Text("🎉")
-                                        .font(.system(size: 60))
+                                    Image(systemName: "party.popper.fill")
+                                        .font(.system(size: 52))
+                                        .foregroundStyle(.yellow)
                                     Text("Send Birthday Message")
                                         .font(.title2)
                                         .fontWeight(.bold)
@@ -57,7 +58,7 @@ struct MessageTemplatePickerView: View {
 
                                 // One-liner hint field
                                 VStack(alignment: .leading, spacing: 8) {
-                                    Text("Add a note (optional)")
+                                    Label("Add a note (optional)", systemImage: "pencil.line")
                                         .font(.subheadline)
                                         .foregroundColor(.white.opacity(0.7))
                                     
@@ -118,7 +119,11 @@ struct MessageTemplatePickerView: View {
                                                 }
                                             }) {
                                                 VStack(alignment: .leading, spacing: 8) {
-                                                    HStack {
+                                                    HStack(spacing: 12) {
+                                                        Image(systemName: tone.systemImage)
+                                                            .font(.title3)
+                                                            .foregroundStyle(.cyan)
+                                                            .frame(width: 28)
                                                         Text(tone.rawValue.capitalized)
                                                             .font(.headline)
                                                             .foregroundColor(.white)
@@ -239,6 +244,19 @@ struct MessageTemplatePickerView: View {
         }
         // Check LLM availability when this view appears
         .task { await updateLLMReadyFlag() }
+        .alert(
+            "Heads up",
+            isPresented: Binding(
+                get: { messageVM.generationNotice != nil },
+                set: { if !$0 { messageVM.generationNotice = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {
+                messageVM.generationNotice = nil
+            }
+        } message: {
+            Text(messageVM.generationNotice ?? "")
+        }
     }
 
     // MARK: - Async LLM hook
@@ -278,18 +296,13 @@ struct MessageTemplatePickerView: View {
 
         await MainActor.run { isRewriting = true }
 
-        // Ask for a different wording than the current message.
-        // We piggyback on your existing hint and append a rewrite instruction.
-        let baseHint = (lastHint ?? userHint).trimmingCharacters(in: .whitespacesAndNewlines)
-        let rewriteNudge = baseHint.isEmpty
-            ? "Please give a different wording than the previous one."
-            : "\(baseHint) Also generate a different wording than this: '\(editableMessage)'."
-
+        // Ask for a different wording than the current message (controlled rewrite path).
         let newBody = await messageVM.generateMessageText(
             tone: tone,
             name: lastName,
             age: lastAge,
-            userHint: rewriteNudge
+            userHint: lastHint ?? userHint,
+            previousMessageToAvoid: editableMessage
         )
 
         await MainActor.run {

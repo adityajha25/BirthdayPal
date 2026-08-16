@@ -63,7 +63,7 @@ final class BirthdayNotificationManager {
         }()
 
         for contact in todaysContacts {
-            let title = "🎂 Birthday today"
+            let title = "Birthday today"
             let name = contact.name
             let body = "It's \(name)'s birthday today!"
 
