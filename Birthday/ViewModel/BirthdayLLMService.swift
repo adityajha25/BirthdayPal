@@ -3,7 +3,7 @@
 import Foundation
 import FoundationModels
 
-/// Result of an on-device (or template) birthday message generation.
+/// Result of an on-device (or remote / template) birthday message generation.
 struct BirthdayLLMOutcome {
     /// Message to show / send (never empty — falls back to a template).
     let text: String
@@ -15,7 +15,9 @@ struct BirthdayLLMService {
 
     private static let maxHintLength = 120
     private static let maxMessageLength = 280
+    private static let openRouterTimeoutSeconds: TimeInterval = 25
 
+    /// Fallback order: Foundation Models (if available) → OpenRouter edge function → MessageTemplates.
     func generateMessage(
         tone: MessageTone?,
         name: String,
@@ -27,7 +29,20 @@ struct BirthdayLLMService {
         let fallback = MessageTemplates.make(tone: tone, name: name, age: age)
 
         if #available(iOS 26.0, *) {
-            return await generateWithAppleModel(
+            if Self.isAppleIntelligenceAvailable {
+                return await generateWithAppleModel(
+                    tone: tone,
+                    name: name,
+                    age: age,
+                    userHint: userHint,
+                    previousMessageToAvoid: previousMessageToAvoid,
+                    fallback: fallback
+                )
+            }
+        }
+
+        if OpenRouterConfig.isConfigured {
+            return await generateWithOpenRouter(
                 tone: tone,
                 name: name,
                 age: age,
@@ -35,8 +50,18 @@ struct BirthdayLLMService {
                 previousMessageToAvoid: previousMessageToAvoid,
                 fallback: fallback
             )
-        } else {
-            return BirthdayLLMOutcome(text: fallback, notice: nil)
+        }
+
+        return BirthdayLLMOutcome(text: fallback, notice: nil)
+    }
+
+    @available(iOS 26.0, *)
+    private static var isAppleIntelligenceAvailable: Bool {
+        switch SystemLanguageModel.default.availability {
+        case .available:
+            return true
+        default:
+            return false
         }
     }
 
@@ -134,6 +159,103 @@ struct BirthdayLLMService {
         return text
     }
 
+    // MARK: - OpenRouter (Supabase Edge Function)
+
+    private func generateWithOpenRouter(
+        tone: MessageTone?,
+        name: String,
+        age: Int?,
+        userHint: String?,
+        previousMessageToAvoid: String?,
+        fallback: String
+    ) async -> BirthdayLLMOutcome {
+        guard let url = OpenRouterConfig.functionURL else {
+            return BirthdayLLMOutcome(text: fallback, notice: nil)
+        }
+
+        let sanitizedHint = Self.sanitizeHint(userHint)
+        let hintWasDropped = !(userHint?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+            && sanitizedHint == nil
+
+        var payload: [String: Any] = ["name": name]
+        if let tone {
+            payload["tone"] = tone.rawValue
+        } else {
+            payload["tone"] = NSNull()
+        }
+        if let age {
+            payload["age"] = age
+        } else {
+            payload["age"] = NSNull()
+        }
+        if let sanitizedHint {
+            payload["userHint"] = sanitizedHint
+        } else {
+            payload["userHint"] = NSNull()
+        }
+        if let previous = previousMessageToAvoid?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !previous.isEmpty {
+            let clipped = previous.count > Self.maxMessageLength
+                ? String(previous.prefix(Self.maxMessageLength))
+                : previous
+            payload["previousMessageToAvoid"] = clipped
+        } else {
+            payload["previousMessageToAvoid"] = NSNull()
+        }
+
+        do {
+            let body = try JSONSerialization.data(withJSONObject: payload)
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.timeoutInterval = Self.openRouterTimeoutSeconds
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue(
+                "Bearer \(OpenRouterConfig.supabaseAnonKey)",
+                forHTTPHeaderField: "Authorization"
+            )
+            request.setValue(OpenRouterConfig.supabaseAnonKey, forHTTPHeaderField: "apikey")
+            request.httpBody = body
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                return Self.openRouterFailureOutcome(fallback: fallback, hintWasDropped: hintWasDropped)
+            }
+
+            guard (200...299).contains(http.statusCode) else {
+                return Self.openRouterFailureOutcome(fallback: fallback, hintWasDropped: hintWasDropped)
+            }
+
+            guard
+                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                let message = json["message"] as? String,
+                let valid = Self.validatedMessage(message, name: name)
+            else {
+                return BirthdayLLMOutcome(
+                    text: fallback,
+                    notice: "Couldn’t use the generated message, so we used a template instead."
+                )
+            }
+
+            let notice = hintWasDropped
+                ? "Your note couldn’t be used, so we wrote a standard birthday message."
+                : nil
+            return BirthdayLLMOutcome(text: valid, notice: notice)
+        } catch {
+            return Self.openRouterFailureOutcome(fallback: fallback, hintWasDropped: hintWasDropped)
+        }
+    }
+
+    private static func openRouterFailureOutcome(
+        fallback: String,
+        hintWasDropped: Bool
+    ) -> BirthdayLLMOutcome {
+        let notice = hintWasDropped
+            ? "Your note couldn’t be used, so we used a birthday template."
+            : "Couldn’t generate a message right now. We used a template instead."
+        return BirthdayLLMOutcome(text: fallback, notice: notice)
+    }
+
     // MARK: - Foundation Models
 
     @available(iOS 26.0, *)
@@ -150,6 +272,17 @@ struct BirthdayLLMService {
         case .available:
             break
         default:
+            // Caller should have checked; still fall through to OpenRouter if configured.
+            if OpenRouterConfig.isConfigured {
+                return await generateWithOpenRouter(
+                    tone: tone,
+                    name: name,
+                    age: age,
+                    userHint: userHint,
+                    previousMessageToAvoid: previousMessageToAvoid,
+                    fallback: fallback
+                )
+            }
             return BirthdayLLMOutcome(text: fallback, notice: nil)
         }
 

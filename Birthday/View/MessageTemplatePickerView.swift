@@ -520,7 +520,12 @@ struct MessageTemplatePickerView: View {
 
     // MARK: - LLM availability check
 
+    /// True when on-device Apple Intelligence or the OpenRouter edge function can generate.
     private func updateLLMReadyFlag() async {
+        if OpenRouterConfig.isConfigured {
+            llmReady = true
+            return
+        }
         if #available(iOS 26.0, *) {
             let model = SystemLanguageModel.default
             switch model.availability {
