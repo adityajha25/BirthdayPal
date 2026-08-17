@@ -5,20 +5,18 @@
 
 import SwiftUI
 import UIKit
-import UserNotifications
 
 struct SettingsView: View {
     @ObservedObject var contactsVM: ContactViewModel
     @ObservedObject private var settings = AppSettings.shared
 
     @State private var showShareSheet = false
-    @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
     @State private var initialPingDraft = ""
     @FocusState private var isInitialPingFocused: Bool
 
     var body: some View {
         ZStack {
-            Color(red: 0.08, green: 0.12, blue: 0.28)
+            AppTheme.background
                 .ignoresSafeArea()
 
             ScrollView {
@@ -36,7 +34,7 @@ struct SettingsView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         }
-        .toolbarBackground(Color(red: 0.08, green: 0.12, blue: 0.28), for: .navigationBar)
+        .toolbarBackground(AppTheme.background, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
@@ -49,7 +47,6 @@ struct SettingsView: View {
             }
         }
         .task {
-            await refreshNotificationStatus()
             syncInitialPingDraft(from: settings.initialPingDays)
         }
         .onChange(of: settings.notificationHour) { _, _ in
@@ -100,11 +97,7 @@ struct SettingsView: View {
     private var notificationsSection: some View {
         settingsSection(title: "Notifications") {
             Toggle(isOn: $settings.notificationsEnabled) {
-                settingsLabel(
-                    icon: "bell.fill",
-                    title: "Birthday reminders",
-                    subtitle: notificationStatusSubtitle
-                )
+                settingsLabel(icon: "bell.fill", title: "Birthday reminders")
             }
             .tint(.cyan)
 
@@ -127,11 +120,7 @@ struct SettingsView: View {
             Divider().overlay(Color.white.opacity(0.12))
 
             VStack(alignment: .leading, spacing: 12) {
-                settingsLabel(
-                    icon: "bell.badge",
-                    title: "Initial ping",
-                    subtitle: initialPingSubtitle
-                )
+                settingsLabel(icon: "bell.badge", title: "Initial ping")
 
                 HStack(spacing: 10) {
                     TextField(
@@ -186,11 +175,7 @@ struct SettingsView: View {
             Button {
                 openSystemSettings()
             } label: {
-                settingsRow(
-                    icon: "gear",
-                    title: "System notification settings",
-                    subtitle: "Open iOS Settings"
-                )
+                settingsRow(icon: "gear", title: "System notification settings")
             }
             .buttonStyle(.plain)
         }
@@ -199,11 +184,7 @@ struct SettingsView: View {
     private var displaySection: some View {
         settingsSection(title: "Display") {
             Toggle(isOn: $settings.showAgeTurning) {
-                settingsLabel(
-                    icon: "cake",
-                    title: "Show age turning",
-                    subtitle: "Only when birth year is available"
-                )
+                settingsLabel(icon: "cake", title: "Show age turning")
             }
             .tint(.cyan)
 
@@ -213,11 +194,7 @@ struct SettingsView: View {
                 contactsVM.loadContacts(force: true)
                 contactsVM.loadMissingBirthdayContactsIfNeeded(force: true)
             } label: {
-                settingsRow(
-                    icon: "arrow.clockwise",
-                    title: "Refresh contacts",
-                    subtitle: "Reload birthdays from Contacts"
-                )
+                settingsRow(icon: "arrow.clockwise", title: "Refresh contacts")
             }
             .buttonStyle(.plain)
         }
@@ -228,11 +205,7 @@ struct SettingsView: View {
             Button {
                 openURL(AppSettings.writeReviewURL)
             } label: {
-                settingsRow(
-                    icon: "star.fill",
-                    title: "Rate on the App Store",
-                    subtitle: "Leave a review"
-                )
+                settingsRow(icon: "star.fill", title: "Rate on the App Store")
             }
             .buttonStyle(.plain)
 
@@ -241,11 +214,7 @@ struct SettingsView: View {
             Button {
                 showShareSheet = true
             } label: {
-                settingsRow(
-                    icon: "square.and.arrow.up",
-                    title: "Send to a friend",
-                    subtitle: "Share the App Store link"
-                )
+                settingsRow(icon: "square.and.arrow.up", title: "Send to a friend")
             }
             .buttonStyle(.plain)
 
@@ -311,14 +280,12 @@ struct SettingsView: View {
 
             Divider().overlay(Color.white.opacity(0.12))
 
-            HStack {
-                settingsLabel(
-                    icon: "lock.shield.fill",
-                    title: "Privacy",
-                    subtitle: "Birthdays stay on your device"
-                )
-                Spacer()
+            Button {
+                openURL(AppSettings.appStoreURL)
+            } label: {
+                settingsRow(icon: "lock.shield.fill", title: "Privacy")
             }
+            .buttonStyle(.plain)
         }
     }
 
@@ -344,7 +311,7 @@ struct SettingsView: View {
         }
     }
 
-    private func settingsLabel(icon: String, title: String, subtitle: String) -> some View {
+    private func settingsLabel(icon: String, title: String, subtitle: String? = nil) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
                 .font(.body)
@@ -356,14 +323,16 @@ struct SettingsView: View {
                     .font(.body)
                     .fontWeight(.semibold)
                     .foregroundStyle(.white)
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.6))
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.6))
+                }
             }
         }
     }
 
-    private func settingsRow(icon: String, title: String, subtitle: String) -> some View {
+    private func settingsRow(icon: String, title: String, subtitle: String? = nil) -> some View {
         HStack {
             settingsLabel(icon: icon, title: title, subtitle: subtitle)
             Spacer()
@@ -375,29 +344,6 @@ struct SettingsView: View {
         .contentShape(Rectangle())
     }
 
-    private var notificationStatusSubtitle: String {
-        switch notificationStatus {
-        case .authorized, .provisional, .ephemeral:
-            return "Always reminds on the birthday"
-        case .denied:
-            return "Permission denied — enable in Settings"
-        case .notDetermined:
-            return "We’ll ask for permission when needed"
-        @unknown default:
-            return "Always reminds on the birthday"
-        }
-    }
-
-    private var initialPingSubtitle: String {
-        switch settings.initialPingDays {
-        case 0:
-            return "Empty or 0 is Off — day-of still fires"
-        case 1:
-            return "Also notify 1 day before"
-        default:
-            return "Also notify \(settings.initialPingDays) days before"
-        }
-    }
 
     private var initialPingDraftBinding: Binding<String> {
         Binding(
@@ -453,11 +399,6 @@ struct SettingsView: View {
         BirthdayNotificationManager.shared.refreshDailySchedule(
             contacts: contactsVM.contactsWithBirthday
         )
-    }
-
-    private func refreshNotificationStatus() async {
-        let settings = await UNUserNotificationCenter.current().notificationSettings()
-        notificationStatus = settings.authorizationStatus
     }
 
     private func openSystemSettings() {

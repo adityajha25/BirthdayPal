@@ -25,6 +25,7 @@ struct MessageTemplatePickerView: View {
     @State private var showShareSheet: Bool = false
     @State private var copiedConfirmation: Bool = false
     @State private var copyResetTask: Task<Void, Never>?
+    @FocusState private var isNoteFieldFocused: Bool
 
     private var currentContact: CNContact? {
         guard messageVM.todaysBirthdayContacts.indices.contains(messageVM.currentIndex) else {
@@ -38,7 +39,7 @@ struct MessageTemplatePickerView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(red: 0.08, green: 0.12, blue: 0.28)
+                AppTheme.background
                     .ignoresSafeArea()
 
                 if !showEditor {
@@ -81,7 +82,7 @@ struct MessageTemplatePickerView: View {
                     VStack(spacing: 12) {
                         ContactPhotoView(
                             name: displayName(for: contact),
-                            thumbnailData: photoData(for: contact),
+                            thumbnailData: messageVM.thumbnailData(for: messageVM.currentIndex),
                             size: 80
                         )
                         Text("Send Birthday Message")
@@ -99,10 +100,10 @@ struct MessageTemplatePickerView: View {
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.7))
 
-                        TextField("e.g. mention our trip, keep it short",
-                                  text: $userHint,
-                                  axis: .vertical)
-                            .lineLimit(1...3)
+                        TextField("", text: $userHint)
+                            .focused($isNoteFieldFocused)
+                            .submitLabel(.done)
+                            .onSubmit { isNoteFieldFocused = false }
                             .padding(12)
                             .background(glassFieldBackground)
                             .foregroundColor(.white)
@@ -113,12 +114,6 @@ struct MessageTemplatePickerView: View {
                         Label("Message style (optional)", systemImage: "paintbrush.pointed.fill")
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.7))
-
-                        Text("Pick a style, or skip it and generate from your note.")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.5))
-
-                        skipStyleCard
 
                         LazyVGrid(
                             columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
@@ -150,7 +145,7 @@ struct MessageTemplatePickerView: View {
                                 HStack(spacing: 10) {
                                     Image(systemName: "sparkles")
                                         .font(.title3)
-                                    Text(generateButtonTitle)
+                                    Text("Generate")
                                         .font(.headline)
                                 }
                                 .foregroundColor(.white)
@@ -159,19 +154,6 @@ struct MessageTemplatePickerView: View {
                                 .background(Color.blue)
                                 .cornerRadius(16)
                                 .shadow(color: Color.black.opacity(0.3), radius: 12, x: 0, y: 6)
-                            }
-
-                            if selectedTone != nil {
-                                Button {
-                                    selectedTone = nil
-                                    Task {
-                                        await generateMessage(tone: nil, contact: contact)
-                                    }
-                                } label: {
-                                    Label("Generate without a style", systemImage: "text.bubble")
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundColor(.cyan)
-                                }
                             }
 
                             if !llmReady {
@@ -197,36 +179,8 @@ struct MessageTemplatePickerView: View {
                 }
             }
         }
-    }
-
-    private var skipStyleCard: some View {
-        Button {
-            selectedTone = nil
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "sparkles")
-                    .font(.title3)
-                    .foregroundStyle(.cyan)
-                    .frame(width: 28)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("No style")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                    Text("Follow your note only")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.55))
-                }
-                Spacer()
-                Image(systemName: selectedTone == nil ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(selectedTone == nil ? .cyan : .white.opacity(0.35))
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity)
-            .background(glassCardBackground(isSelected: selectedTone == nil))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("No style")
-        .accessibilityAddTraits(selectedTone == nil ? .isSelected : [])
+        .scrollDismissesKeyboard(.interactively)
+        .simultaneousGesture(TapGesture().onEnded { isNoteFieldFocused = false })
     }
 
     private func styleCard(for tone: MessageTone) -> some View {
@@ -256,33 +210,24 @@ struct MessageTemplatePickerView: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    private var generateButtonTitle: String {
-        if let selectedTone {
-            return "Generate \(selectedTone.displayName) Message"
-        }
-        return "Generate without a style"
-    }
-
     // MARK: - Editor
 
     private var messageEditorScreen: some View {
         VStack(spacing: 20) {
-            HStack {
-                Button {
-                    showEditor = false
-                } label: {
-                    Label("Back", systemImage: "chevron.left")
+            ZStack {
+                HStack {
+                    Button {
+                        showEditor = false
+                    } label: {
+                        Label("Back", systemImage: "chevron.left")
+                    }
+                    .foregroundColor(.cyan)
+                    Spacer()
                 }
-                .foregroundColor(.cyan)
-
-                Spacer()
 
                 Text("Edit Message")
                     .font(.headline)
                     .foregroundColor(.white)
-
-                Spacer()
-                    .frame(width: 64)
             }
             .padding(.horizontal)
             .padding(.top, 12)
@@ -310,7 +255,7 @@ struct MessageTemplatePickerView: View {
                             .padding(.vertical, 8)
                             .background(
                                 Capsule()
-                                    .fill(Color(red: 0.12, green: 0.16, blue: 0.35).opacity(0.92))
+                                    .fill(AppTheme.surface.opacity(0.92))
                                     .overlay(
                                         Capsule()
                                             .stroke(Color.white.opacity(0.2), lineWidth: 1)
@@ -358,14 +303,7 @@ struct MessageTemplatePickerView: View {
             }
             .padding(.horizontal)
 
-            VStack(spacing: 4) {
-                Text("Edit the message before sending")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.6))
-                Text(editorContextCaption)
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.45))
-            }
+            generationSourceIndicator
 
             Spacer()
 
@@ -392,11 +330,17 @@ struct MessageTemplatePickerView: View {
         .animation(.easeInOut(duration: 0.2), value: copiedConfirmation)
     }
 
-    private var editorContextCaption: String {
-        if let lastTone {
-            return "Style: \(lastTone.displayName)"
+    private var generationSourceIndicator: some View {
+        HStack(spacing: 8) {
+            if messageVM.lastGenerationSource.showsOnlineIndicator {
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 8, height: 8)
+            }
+            Text(messageVM.lastGenerationSource.displayName)
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.6))
         }
-        return "No style — based on your note"
     }
 
     private func editorActionButton(
@@ -435,7 +379,7 @@ struct MessageTemplatePickerView: View {
 
     private var glassFieldBackground: some View {
         RoundedRectangle(cornerRadius: 12)
-            .fill(Color(red: 0.12, green: 0.16, blue: 0.35).opacity(0.5))
+            .fill(AppTheme.surface.opacity(0.5))
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(Color.white.opacity(0.15), lineWidth: 1)
@@ -444,7 +388,7 @@ struct MessageTemplatePickerView: View {
 
     private func glassCardBackground(isSelected: Bool) -> some View {
         RoundedRectangle(cornerRadius: 12)
-            .fill(Color(red: 0.12, green: 0.16, blue: 0.35).opacity(isSelected ? 0.75 : 0.5))
+            .fill(AppTheme.surface.opacity(isSelected ? 0.75 : 0.5))
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(isSelected ? Color.cyan.opacity(0.75) : Color.white.opacity(0.2), lineWidth: isSelected ? 2 : 1)
@@ -520,7 +464,12 @@ struct MessageTemplatePickerView: View {
 
     // MARK: - LLM availability check
 
+    /// True when on-device Apple Intelligence or the OpenRouter edge function can generate.
     private func updateLLMReadyFlag() async {
+        if OpenRouterConfig.isConfigured {
+            llmReady = true
+            return
+        }
         if #available(iOS 26.0, *) {
             let model = SystemLanguageModel.default
             switch model.availability {
@@ -568,16 +517,6 @@ struct MessageTemplatePickerView: View {
         } else {
             return "there"
         }
-    }
-
-    private func photoData(for contact: CNContact) -> Data? {
-        if contact.isKeyAvailable(CNContactThumbnailImageDataKey) {
-            return contact.thumbnailImageData
-        }
-        if contact.isKeyAvailable(CNContactImageDataKey) {
-            return contact.imageData
-        }
-        return nil
     }
 
     private func messagePreview(for tone: MessageTone?, contact: CNContact) -> String {

@@ -12,10 +12,12 @@ import SwiftUI
 struct MyApp: App {
     init() {
         BirthdayNotificationManager.shared.setUp()
+        BirthdayNotificationManager.shared.refreshScheduleFromContactsIfEnabled()
     }
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .preferredColorScheme(.dark)
         }
     }
 }

@@ -5,6 +5,9 @@ import Foundation
 import Combine
 import WidgetKit
 import Contacts
+import os
+
+private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "BirthdayPal", category: "Contacts")
 
 private let rememberedCountKey = "BirthdayRememberedCount"
 
@@ -17,7 +20,7 @@ final class ContactViewModel: ObservableObject {
     /// Loaded on demand for the add-missing flow.
     @Published var contactsWithoutBirthday: [Contact] = []
 
-    /// Precomputed home / filter slices (rebuilt after each birthday load).
+    /// Upcoming birthdays for the home carousel, sorted by next observance.
     @Published private(set) var upcomingPreview: [Contact] = []
     @Published private(set) var todaysBirthdays: [Contact] = []
     @Published private(set) var birthdaysThisMonth: [Contact] = []
@@ -90,7 +93,7 @@ final class ContactViewModel: ObservableObject {
 
             case .failure(let error):
                 self.errorMessage = error.localizedDescription
-                print("Error fetching contacts: \(error)")
+                logger.error("Error fetching contacts: \(error.localizedDescription, privacy: .public)")
             }
 
             // Flip loading last so observers (deep links) see contacts already applied.
@@ -123,7 +126,7 @@ final class ContactViewModel: ObservableObject {
                     fetched: fetched
                 )
             case .failure(let error):
-                print("Error fetching contacts without birthdays: \(error)")
+                logger.error("Error fetching contacts without birthdays: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
@@ -131,52 +134,6 @@ final class ContactViewModel: ObservableObject {
     func contact(withId id: String) -> Contact? {
         contactsWithBirthday.first { $0.id == id }
             ?? contactsWithoutBirthday.first { $0.id == id }
-    }
-
-    /// Persists a birthday to system Contacts, then promotes the contact in app state.
-    /// Completion is always invoked on the main thread.
-    func assignBirthday(
-        contactID: String,
-        components: DateComponents,
-        completion: @escaping (Result<Void, Error>) -> Void
-    ) {
-        guard contactsWithoutBirthday.contains(where: { $0.id == contactID }) else {
-            completion(.failure(NSError(
-                domain: "ContactViewModel",
-                code: 404,
-                userInfo: [NSLocalizedDescriptionKey: "Contact not found in missing birthdays"]
-            )))
-            return
-        }
-
-        contactsManager.saveBirthday(
-            contactIdentifier: contactID,
-            components: components
-        ) { [weak self] result in
-            guard let self else { return }
-            switch result {
-            case .failure(let error):
-                completion(.failure(error))
-            case .success:
-                self.promoteAssignedBirthday(contactID: contactID, components: components)
-                completion(.success(()))
-            }
-        }
-    }
-
-    /// Moves a contact from the missing list into the birthday list after a successful Contacts save.
-    private func promoteAssignedBirthday(contactID: String, components: DateComponents) {
-        guard let index = contactsWithoutBirthday.firstIndex(where: { $0.id == contactID }) else { return }
-        var contact = contactsWithoutBirthday.remove(at: index)
-        contact.birthday = components
-        contact = contact.enrichingCaches()
-
-        contactsWithBirthday.append(contact)
-        contactsWithBirthday.sort {
-            ($0.cachedDaysUntil ?? Int.max) < ($1.cachedDaysUntil ?? Int.max)
-        }
-        rebuildDerivedCaches()
-        scheduleNotificationsAndWidgets()
     }
 
     // MARK: - Remembered counter
@@ -228,7 +185,7 @@ final class ContactViewModel: ObservableObject {
 
     private func rebuildDerivedCaches() {
         let list = contactsWithBirthday
-        upcomingPreview = Array(list.prefix(3))
+        upcomingPreview = list
         todaysBirthdays = list.filter { $0.daysToBirthday == 0 }
 
         let calendar = Calendar.current
