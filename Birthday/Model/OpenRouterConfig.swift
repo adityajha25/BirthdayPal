@@ -10,49 +10,33 @@ import Foundation
 
 /// Supabase project settings used to invoke `generate-birthday-message`.
 ///
-/// Fill the placeholders below, **or** set Info.plist / xcconfig keys:
-/// - `SUPABASE_URL` — project root **or** full function URL (either works):
-///   - `https://YOUR_PROJECT.supabase.co`
-///   - `https://YOUR_PROJECT.supabase.co/functions/v1/generate-birthday-message`
-/// - `SUPABASE_ANON_KEY` — project anon (public) key
+/// Values are read from Info.plist:
+/// - `SUPABASE_URL` — project root or full function URL, e.g.
+///   `https://YOUR_PROJECT.supabase.co/functions/v1/generate-birthday-message`
+/// - `SUPABASE_ANON_KEY` — Supabase anon (public) key from Project Settings → API
 enum OpenRouterConfig {
 
-    /// Fallback when Info.plist has no `SUPABASE_URL`.
-    /// Accepts project root or the full Edge Function invoke URL.
-    private static let placeholderURL = "https://khanavjbozyavakkndvr.supabase.co/functions/v1/generate-birthday-message"
-
-    /// Fallback when Info.plist has no `SUPABASE_ANON_KEY`.
-    private static let placeholderAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoYW5hdmpib3p5YXZha2tuZHZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MzQ3MzQsImV4cCI6MjEwMTIxMDczNH0.rjFRk19Jh0I4kEViOYOgHgJMYZKRa71d2gWZItbcTtI"
-
-    /// Function path under `/functions/v1/`.
     static let functionName = "generate-birthday-message"
 
     static var supabaseURLString: String {
-        if let fromPlist = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
-           !fromPlist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return fromPlist.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let fromPlist = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String else {
+            return ""
         }
-        return placeholderURL
+        return fromPlist.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     static var supabaseAnonKey: String {
-        if let fromPlist = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_ANON_KEY") as? String,
-           !fromPlist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return fromPlist.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let fromPlist = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_ANON_KEY") as? String else {
+            return ""
         }
-        return placeholderAnonKey
+        return fromPlist.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// `https://<project>.supabase.co/functions/v1/generate-birthday-message`
-    ///
-    /// Normalizes project root, `/functions/v1`, or a full function URL so the
-    /// path is never doubled.
     static var functionURL: URL? {
         guard isConfigured else { return nil }
         return Self.normalizedFunctionURL(from: supabaseURLString, functionName: functionName)
     }
 
-    /// True when URL and anon key look filled in (not the shipped placeholders).
     static var isConfigured: Bool {
         let url = supabaseURLString
         let key = supabaseAnonKey
@@ -62,7 +46,6 @@ enum OpenRouterConfig {
         return URL(string: url) != nil
     }
 
-    /// Builds the invoke URL from a project root, functions base, or full function URL.
     static func normalizedFunctionURL(from raw: String, functionName: String) -> URL? {
         var base = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         while base.hasSuffix("/") {

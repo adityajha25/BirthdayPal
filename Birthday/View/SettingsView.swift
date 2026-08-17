@@ -18,7 +18,7 @@ struct SettingsView: View {
 
     var body: some View {
         ZStack {
-            Color(red: 0.08, green: 0.12, blue: 0.28)
+            AppTheme.background
                 .ignoresSafeArea()
 
             ScrollView {
@@ -36,7 +36,7 @@ struct SettingsView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         }
-        .toolbarBackground(Color(red: 0.08, green: 0.12, blue: 0.28), for: .navigationBar)
+        .toolbarBackground(AppTheme.background, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {

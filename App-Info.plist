@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>SUPABASE_URL</key>
+	<string>https://khanavjbozyavakkndvr.supabase.co/functions/v1/generate-birthday-message</string>
+	<key>SUPABASE_ANON_KEY</key>
+	<string>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtoYW5hdmpib3p5YXZha2tuZHZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2MzQ3MzQsImV4cCI6MjEwMTIxMDczNH0.rjFRk19Jh0I4kEViOYOgHgJMYZKRa71d2gWZItbcTtI</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

@@ -3,12 +3,39 @@
 import Foundation
 import FoundationModels
 
+enum BirthdayLLMSource: Equatable {
+    case appleFoundationModel
+    case openRouter
+    case templates
+
+    var displayName: String {
+        switch self {
+        case .appleFoundationModel:
+            return "Apple Foundation Model · Local"
+        case .openRouter:
+            return "OpenRouter · Google Gemma 4"
+        case .templates:
+            return "Built-in template"
+        }
+    }
+
+    var showsOnlineIndicator: Bool {
+        switch self {
+        case .appleFoundationModel, .openRouter:
+            return true
+        case .templates:
+            return false
+        }
+    }
+}
+
 /// Result of an on-device (or remote / template) birthday message generation.
 struct BirthdayLLMOutcome {
     /// Message to show / send (never empty — falls back to a template).
     let text: String
     /// Optional user-facing notice (guardrail, refusal, invalid output, etc.).
     let notice: String?
+    let source: BirthdayLLMSource
 }
 
 struct BirthdayLLMService {
@@ -52,7 +79,7 @@ struct BirthdayLLMService {
             )
         }
 
-        return BirthdayLLMOutcome(text: fallback, notice: nil)
+        return BirthdayLLMOutcome(text: fallback, notice: nil, source: .templates)
     }
 
     @available(iOS 26.0, *)
@@ -170,7 +197,7 @@ struct BirthdayLLMService {
         fallback: String
     ) async -> BirthdayLLMOutcome {
         guard let url = OpenRouterConfig.functionURL else {
-            return BirthdayLLMOutcome(text: fallback, notice: nil)
+            return BirthdayLLMOutcome(text: fallback, notice: nil, source: .templates)
         }
 
         let sanitizedHint = Self.sanitizeHint(userHint)
@@ -233,14 +260,15 @@ struct BirthdayLLMService {
             else {
                 return BirthdayLLMOutcome(
                     text: fallback,
-                    notice: "Couldn’t use the generated message, so we used a template instead."
+                    notice: "Couldn’t use the generated message, so we used a template instead.",
+                    source: .templates
                 )
             }
 
             let notice = hintWasDropped
                 ? "Your note couldn’t be used, so we wrote a standard birthday message."
                 : nil
-            return BirthdayLLMOutcome(text: valid, notice: notice)
+            return BirthdayLLMOutcome(text: valid, notice: notice, source: .openRouter)
         } catch {
             return Self.openRouterFailureOutcome(fallback: fallback, hintWasDropped: hintWasDropped)
         }
@@ -253,7 +281,7 @@ struct BirthdayLLMService {
         let notice = hintWasDropped
             ? "Your note couldn’t be used, so we used a birthday template."
             : "Couldn’t generate a message right now. We used a template instead."
-        return BirthdayLLMOutcome(text: fallback, notice: notice)
+        return BirthdayLLMOutcome(text: fallback, notice: notice, source: .templates)
     }
 
     // MARK: - Foundation Models
@@ -283,7 +311,7 @@ struct BirthdayLLMService {
                     fallback: fallback
                 )
             }
-            return BirthdayLLMOutcome(text: fallback, notice: nil)
+            return BirthdayLLMOutcome(text: fallback, notice: nil, source: .templates)
         }
 
         let sanitizedHint = Self.sanitizeHint(userHint)
@@ -349,17 +377,85 @@ struct BirthdayLLMService {
                 let notice = hintWasDropped
                     ? "Your note couldn’t be used, so we wrote a standard birthday message."
                     : nil
-                return BirthdayLLMOutcome(text: valid, notice: notice)
+                return BirthdayLLMOutcome(text: valid, notice: notice, source: .appleFoundationModel)
             }
 
-            return BirthdayLLMOutcome(
-                text: fallback,
+            return await openRouterOrTemplate(
+                tone: tone,
+                name: name,
+                age: age,
+                userHint: userHint,
+                previousMessageToAvoid: previousMessageToAvoid,
+                fallback: fallback,
                 notice: "Couldn’t use the generated message, so we used a template instead."
             )
         } catch let error as LanguageModelSession.GenerationError {
-            return outcome(for: error, fallback: fallback, hintWasDropped: hintWasDropped)
+            let notice = Self.notice(for: error, hintWasDropped: hintWasDropped)
+            return await openRouterOrTemplate(
+                tone: tone,
+                name: name,
+                age: age,
+                userHint: userHint,
+                previousMessageToAvoid: previousMessageToAvoid,
+                fallback: fallback,
+                notice: notice
+            )
         } catch {
-            return BirthdayLLMOutcome(text: fallback, notice: nil)
+            return await openRouterOrTemplate(
+                tone: tone,
+                name: name,
+                age: age,
+                userHint: userHint,
+                previousMessageToAvoid: previousMessageToAvoid,
+                fallback: fallback,
+                notice: nil
+            )
+        }
+    }
+
+    private func openRouterOrTemplate(
+        tone: MessageTone?,
+        name: String,
+        age: Int?,
+        userHint: String?,
+        previousMessageToAvoid: String?,
+        fallback: String,
+        notice: String?
+    ) async -> BirthdayLLMOutcome {
+        if OpenRouterConfig.isConfigured {
+            let result = await generateWithOpenRouter(
+                tone: tone,
+                name: name,
+                age: age,
+                userHint: userHint,
+                previousMessageToAvoid: previousMessageToAvoid,
+                fallback: fallback
+            )
+            if result.source == .openRouter {
+                return result
+            }
+        }
+        return BirthdayLLMOutcome(text: fallback, notice: notice, source: .templates)
+    }
+
+    @available(iOS 26.0, *)
+    private static func notice(
+        for error: LanguageModelSession.GenerationError,
+        hintWasDropped: Bool
+    ) -> String {
+        switch error {
+        case .guardrailViolation:
+            return "That request wasn’t allowed. We used a safe birthday template instead. Try a simpler note."
+        case .refusal:
+            return "The on-device model declined that request. We used a birthday template instead."
+        case .exceededContextWindowSize:
+            return "The request was too long. We used a birthday template instead."
+        case .unsupportedLanguageOrLocale:
+            return "That language isn’t supported for generation. We used a template instead."
+        default:
+            return hintWasDropped
+                ? "Your note couldn’t be used, so we used a birthday template."
+                : "Couldn’t generate a message right now. We used a template instead."
         }
     }
 
@@ -369,22 +465,8 @@ struct BirthdayLLMService {
         fallback: String,
         hintWasDropped: Bool
     ) -> BirthdayLLMOutcome {
-        let notice: String
-        switch error {
-        case .guardrailViolation:
-            notice = "That request wasn’t allowed. We used a safe birthday template instead. Try a simpler note."
-        case .refusal:
-            notice = "The on-device model declined that request. We used a birthday template instead."
-        case .exceededContextWindowSize:
-            notice = "The request was too long. We used a birthday template instead."
-        case .unsupportedLanguageOrLocale:
-            notice = "That language isn’t supported for generation. We used a template instead."
-        default:
-            notice = hintWasDropped
-                ? "Your note couldn’t be used, so we used a birthday template."
-                : "Couldn’t generate a message right now. We used a template instead."
-        }
-        return BirthdayLLMOutcome(text: fallback, notice: notice)
+        let notice = Self.notice(for: error, hintWasDropped: hintWasDropped)
+        return BirthdayLLMOutcome(text: fallback, notice: notice, source: .templates)
     }
 
     private static func modelInstructions(tone: MessageTone?) -> String {

@@ -204,36 +204,6 @@ class ContactsManager {
         }
     }
 
-    /// Writes a birthday to the system Contacts database for the given contact identifier.
-    func saveBirthday(
-        contactIdentifier: String,
-        components: DateComponents,
-        completion: @escaping (Result<Void, Error>) -> Void
-    ) {
-        requestContactsAccess { result in
-            switch result {
-            case .failure(let error):
-                DispatchQueue.main.async { completion(.failure(error)) }
-            case .success:
-                DispatchQueue.global(qos: .userInitiated).async {
-                    do {
-                        try self.performBirthdaySave(
-                            contactIdentifier: contactIdentifier,
-                            components: components
-                        )
-                        DispatchQueue.main.async {
-                            completion(.success(()))
-                        }
-                    } catch {
-                        DispatchQueue.main.async {
-                            completion(.failure(error))
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     private func requestContactsAccess(completion: @escaping (Result<Void, Error>) -> Void) {
         contactStore.requestAccess(for: .contacts) { granted, error in
             if let error {
@@ -250,29 +220,6 @@ class ContactsManager {
             }
             completion(.success(()))
         }
-    }
-
-    /// Fetches a mutable contact and saves birthday via CNSaveRequest. Call off the main thread.
-    private func performBirthdaySave(contactIdentifier: String, components: DateComponents) throws {
-        let keysToFetch: [CNKeyDescriptor] = [
-            CNContactIdentifierKey as CNKeyDescriptor,
-            CNContactBirthdayKey as CNKeyDescriptor
-        ]
-        let cnContact = try contactStore.unifiedContact(
-            withIdentifier: contactIdentifier,
-            keysToFetch: keysToFetch
-        )
-        guard let mutableContact = cnContact.mutableCopy() as? CNMutableContact else {
-            throw NSError(
-                domain: "ContactsManager",
-                code: 500,
-                userInfo: [NSLocalizedDescriptionKey: "Could not update this contact"]
-            )
-        }
-        mutableContact.birthday = components
-        let saveRequest = CNSaveRequest()
-        saveRequest.update(mutableContact)
-        try contactStore.execute(saveRequest)
     }
 
     /// Performs the actual contact enumeration. Must be called off the main thread.
@@ -319,15 +266,6 @@ extension Date {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d"
         return formatter.string(from: self)
-    }
-
-    func nextBirthday() -> Date {
-        let today = Calendar.current.startOfDay(for: Date())
-        let birthdayDay = Calendar.current.startOfDay(for: self)
-
-        return birthdayDay < today
-            ? Calendar.current.date(byAdding: .year, value: 1, to: birthdayDay)!
-            : birthdayDay
     }
 
     func formattedDate() -> String {
