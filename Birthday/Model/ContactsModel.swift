@@ -124,15 +124,6 @@ struct Contact: Identifiable, Hashable {
         return calendar.startOfDay(for: nextYear)
     }
 
-    /// Month/day used for repeating calendar notifications (Feb 29 → 28 so it fires yearly).
-    var notificationMonthDay: (month: Int, day: Int)? {
-        guard let month = birthday?.month, let day = birthday?.day else { return nil }
-        if month == 2 && day == 29 {
-            return (2, 28)
-        }
-        return (month, day)
-    }
-
     /// Precomputes next observance / days / age for fast sorting and UI.
     func enrichingCaches(reference: Date = Date(), calendar: Calendar = .current) -> Contact {
         var copy = self

@@ -8,7 +8,6 @@ import Contacts
 
 private let rememberedCountKey = "BirthdayRememberedCount"
 
-@available(iOS 17.0, *)
 final class ContactViewModel: ObservableObject {
 
     // MARK: - Published state for SwiftUI
@@ -263,8 +262,6 @@ final class ContactViewModel: ObservableObject {
     }
 
     private func scheduleNotificationsAndWidgets() {
-        BirthdayNotificationManager.shared.requestAuthorizationIfNeeded()
-
         let settings = AppSettings.shared
         if settings.notificationsEnabled {
             BirthdayNotificationManager.shared.refreshDailySchedule(
