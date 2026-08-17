@@ -31,10 +31,9 @@ final class NotificationsManager: NSObject, UNUserNotificationCenterDelegate {
         completionHandler([.banner, .sound, .list])
     }
 
-    /// Rebuild all birthday notifications from your contacts.
-    /// - Parameters:
-    ///   - contacts: your `Contact` models
-    ///   - fireHour/minute: daily time to notify (local time)
+    /// Unused annual repeating scheduler. Do **not** call this from app launch or contact load —
+    /// `BirthdayNotificationManager.refreshDailySchedule` is the live path and would duplicate
+    /// if both stacks were armed.
     func refreshBirthdayNotifications(
         contacts: [Contact],
         fireHour: Int = 19,

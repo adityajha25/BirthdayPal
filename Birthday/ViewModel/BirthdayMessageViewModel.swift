@@ -39,7 +39,7 @@ final class BirthdayMessageViewModel: ObservableObject {
     }
 
     func generateMessageText(
-        tone: MessageTone,
+        tone: MessageTone?,
         name: String,
         age: Int?,
         userHint: String?,

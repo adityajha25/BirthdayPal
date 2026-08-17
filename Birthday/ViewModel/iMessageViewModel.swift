@@ -83,9 +83,6 @@ final class ContactViewModel: ObservableObject {
 
         contactsManager.fetchContacts(scope: .withBirthdaysOnly) { [weak self] result in
             guard let self else { return }
-            self.isBirthdayFetchInFlight = false
-            self.isLoadingBirthdays = false
-            self.hasCompletedInitialBirthdayLoad = true
 
             switch result {
             case .success(let fetched):
@@ -96,6 +93,11 @@ final class ContactViewModel: ObservableObject {
                 self.errorMessage = error.localizedDescription
                 print("Error fetching contacts: \(error)")
             }
+
+            // Flip loading last so observers (deep links) see contacts already applied.
+            self.isBirthdayFetchInFlight = false
+            self.isLoadingBirthdays = false
+            self.hasCompletedInitialBirthdayLoad = true
         }
     }
 
@@ -266,9 +268,7 @@ final class ContactViewModel: ObservableObject {
         let settings = AppSettings.shared
         if settings.notificationsEnabled {
             BirthdayNotificationManager.shared.refreshDailySchedule(
-                contacts: contactsWithBirthday,
-                fireHour: settings.notificationHour,
-                fireMinute: settings.notificationMinute
+                contacts: contactsWithBirthday
             )
         } else {
             BirthdayNotificationManager.shared.clearAllBirthdayNotifications()
@@ -284,6 +284,7 @@ final class ContactViewModel: ObservableObject {
             if old.name == new.name,
                old.phoneNumber == new.phoneNumber,
                old.birthday == new.birthday,
+               old.thumbnailData == new.thumbnailData,
                old.cachedDaysUntil == new.cachedDaysUntil,
                old.cachedAgeTurning == new.cachedAgeTurning {
                 return old
@@ -298,7 +299,9 @@ final class ContactViewModel: ObservableObject {
             nextName: next?.name,
             daysToNext: next?.daysToBirthday,
             upcomingThisMonth: birthdaysThisMonthCount,
-            rememberedCount: rememberedBirthdaysCount
+            rememberedCount: rememberedBirthdaysCount,
+            nextContactID: next?.id,
+            nextThumbnail: next?.thumbnailData
         )
 
         let defaults = UserDefaults(suiteName: "group.com.archit.BirthdayPal")

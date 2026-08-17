@@ -11,6 +11,8 @@ enum MessageTone: String, CaseIterable, Identifiable {
     case formal, casual, funny, romantic
     var id: String { rawValue }
 
+    var displayName: String { rawValue.capitalized }
+
     var systemImage: String {
         switch self {
         case .formal: return "text.book.closed.fill"
@@ -23,6 +25,13 @@ enum MessageTone: String, CaseIterable, Identifiable {
 
 
 struct MessageTemplates {
+    static func make(tone: MessageTone?, name: String, age: Int?) -> String {
+        guard let tone else {
+            return "Happy birthday, \(name)! Hope you have a wonderful day."
+        }
+        return make(tone: tone, name: name, age: age)
+    }
+
     static func make(tone: MessageTone, name: String, age: Int?) -> String {
         switch tone {
         case .formal:

@@ -14,6 +14,8 @@ struct SettingsView: View {
 
     @State private var showShareSheet = false
     @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
+    @State private var initialPingDraft = ""
+    @FocusState private var isInitialPingFocused: Bool
 
     var body: some View {
         ZStack {
@@ -33,19 +35,43 @@ struct SettingsView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 40)
             }
+            .scrollDismissesKeyboard(.interactively)
         }
         .toolbarBackground(Color(red: 0.08, green: 0.12, blue: 0.28), for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") {
+                    isInitialPingFocused = false
+                    commitInitialPingDraft(normalize: true)
+                }
+                .foregroundStyle(.cyan)
+            }
+        }
         .task {
             await refreshNotificationStatus()
+            syncInitialPingDraft(from: settings.initialPingDays)
         }
         .onChange(of: settings.notificationHour) { _, _ in
             rescheduleNotifications()
         }
-        .onChange(of: settings.notificationMinute) { _, _ in
-            rescheduleNotifications()
-        }
-        .onChange(of: settings.notificationsEnabled) { _, enabled in
+            .onChange(of: settings.notificationMinute) { _, _ in
+                rescheduleNotifications()
+            }
+            .onChange(of: settings.initialPingDays) { _, days in
+                let parsed = Int(initialPingDraft.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+                if parsed != days {
+                    syncInitialPingDraft(from: days)
+                }
+                rescheduleNotifications()
+            }
+            .onChange(of: isInitialPingFocused) { _, focused in
+                if !focused {
+                    commitInitialPingDraft(normalize: true)
+                }
+            }
+            .onChange(of: settings.notificationsEnabled) { _, enabled in
             if enabled {
                 BirthdayNotificationManager.shared.requestAuthorizationIfNeeded()
                 rescheduleNotifications()
@@ -95,6 +121,63 @@ struct SettingsView: View {
             )
             .foregroundStyle(.white)
             .tint(.cyan)
+            .colorScheme(.dark)
+            .disabled(!settings.notificationsEnabled)
+            .opacity(settings.notificationsEnabled ? 1 : 0.45)
+
+            Divider().overlay(Color.white.opacity(0.12))
+
+            VStack(alignment: .leading, spacing: 12) {
+                settingsLabel(
+                    icon: "bell.badge",
+                    title: "Initial ping",
+                    subtitle: initialPingSubtitle
+                )
+
+                HStack(spacing: 10) {
+                    TextField(
+                        "",
+                        text: initialPingDraftBinding,
+                        prompt: Text("Off").foregroundStyle(.white.opacity(0.35))
+                    )
+                    .keyboardType(.numberPad)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .multilineTextAlignment(.center)
+                    .focused($isInitialPingFocused)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
+                    .frame(minWidth: 52, maxWidth: 64)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.white.opacity(0.08))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(Color.cyan.opacity(isInitialPingFocused ? 0.55 : 0.18), lineWidth: 1)
+                    )
+                    .accessibilityLabel("Days before birthday")
+
+                    Text(settings.initialPingDays == 1 ? "day before" : "days before")
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.65))
+                        .lineLimit(1)
+
+                    Spacer(minLength: 4)
+
+                    Stepper(
+                        "",
+                        value: $settings.initialPingDays,
+                        in: 0...AppSettings.initialPingDaysMax
+                    )
+                    .labelsHidden()
+                    .tint(.cyan)
+                    .fixedSize()
+                    .accessibilityLabel("Initial ping days")
+                }
+            }
             .colorScheme(.dark)
             .disabled(!settings.notificationsEnabled)
             .opacity(settings.notificationsEnabled ? 1 : 0.45)
@@ -296,13 +379,64 @@ struct SettingsView: View {
     private var notificationStatusSubtitle: String {
         switch notificationStatus {
         case .authorized, .provisional, .ephemeral:
-            return "Alerts on birthday mornings"
+            return "Always reminds on the birthday"
         case .denied:
             return "Permission denied — enable in Settings"
         case .notDetermined:
             return "We’ll ask for permission when needed"
         @unknown default:
-            return "Alerts on birthday mornings"
+            return "Always reminds on the birthday"
+        }
+    }
+
+    private var initialPingSubtitle: String {
+        switch settings.initialPingDays {
+        case 0:
+            return "Empty or 0 is Off — day-of still fires"
+        case 1:
+            return "Also notify 1 day before"
+        default:
+            return "Also notify \(settings.initialPingDays) days before"
+        }
+    }
+
+    private var initialPingDraftBinding: Binding<String> {
+        Binding(
+            get: { initialPingDraft },
+            set: { commitInitialPingDraft(raw: $0, normalize: false) }
+        )
+    }
+
+    private func syncInitialPingDraft(from days: Int) {
+        initialPingDraft = days == 0 ? "" : String(days)
+    }
+
+    /// Parses the days field. Empty or 0 → Off. Negatives and non-integers are rejected; values above the max are clamped.
+    private func commitInitialPingDraft(raw: String? = nil, normalize: Bool) {
+        let source = raw ?? initialPingDraft
+        let digitsOnly = source.filter { $0 >= "0" && $0 <= "9" }
+
+        if digitsOnly.isEmpty {
+            initialPingDraft = ""
+            if settings.initialPingDays != 0 {
+                settings.initialPingDays = 0
+            }
+            return
+        }
+
+        guard let value = Int(digitsOnly) else {
+            syncInitialPingDraft(from: settings.initialPingDays)
+            return
+        }
+
+        let clamped = AppSettings.clampedInitialPingDays(value)
+        if settings.initialPingDays != clamped {
+            settings.initialPingDays = clamped
+        }
+        if normalize || clamped != value {
+            syncInitialPingDraft(from: clamped)
+        } else {
+            initialPingDraft = digitsOnly
         }
     }
 
@@ -319,9 +453,7 @@ struct SettingsView: View {
         guard settings.notificationsEnabled else { return }
         BirthdayNotificationManager.shared.invalidateDailyScheduleMarker()
         BirthdayNotificationManager.shared.refreshDailySchedule(
-            contacts: contactsVM.contactsWithBirthday,
-            fireHour: settings.notificationHour,
-            fireMinute: settings.notificationMinute
+            contacts: contactsVM.contactsWithBirthday
         )
     }
 

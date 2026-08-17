@@ -14,6 +14,8 @@ struct Contact: Identifiable, Hashable {
     let name: String
     let phoneNumber: String?
     var birthday: DateComponents?
+    /// Contacts thumbnail JPEG/PNG bytes. Optional so Hashable stays synthesized via `Data`.
+    var thumbnailData: Data?
 
     /// Filled once at fetch time so UI/sort avoid repeated calendar math.
     var cachedNextObservance: Date?
@@ -25,6 +27,7 @@ struct Contact: Identifiable, Hashable {
         name: String,
         phoneNumber: String?,
         birthday: DateComponents?,
+        thumbnailData: Data? = nil,
         cachedNextObservance: Date? = nil,
         cachedDaysUntil: Int? = nil,
         cachedAgeTurning: Int? = nil
@@ -33,6 +36,7 @@ struct Contact: Identifiable, Hashable {
         self.name = name
         self.phoneNumber = phoneNumber
         self.birthday = birthday
+        self.thumbnailData = thumbnailData
         self.cachedNextObservance = cachedNextObservance
         self.cachedDaysUntil = cachedDaysUntil
         self.cachedAgeTurning = cachedAgeTurning
@@ -287,7 +291,9 @@ class ContactsManager {
             CNContactGivenNameKey as CNKeyDescriptor,
             CNContactFamilyNameKey as CNKeyDescriptor,
             CNContactPhoneNumbersKey as CNKeyDescriptor,
-            CNContactBirthdayKey as CNKeyDescriptor
+            CNContactBirthdayKey as CNKeyDescriptor,
+            CNContactImageDataAvailableKey as CNKeyDescriptor,
+            CNContactThumbnailImageDataKey as CNKeyDescriptor
         ]
         let request = CNContactFetchRequest(keysToFetch: keysToFetch)
         var contacts: [Contact] = []
@@ -302,12 +308,14 @@ class ContactsManager {
 
             let name = "\(cnContact.givenName) \(cnContact.familyName)".trimmingCharacters(in: .whitespaces)
             let phoneNumber = cnContact.phoneNumbers.first?.value.stringValue
+            let thumbnailData: Data? = cnContact.imageDataAvailable ? cnContact.thumbnailImageData : nil
             contacts.append(
                 Contact(
                     id: cnContact.identifier,
                     name: name.isEmpty ? "No Name" : name,
                     phoneNumber: phoneNumber,
-                    birthday: cnContact.birthday
+                    birthday: cnContact.birthday,
+                    thumbnailData: thumbnailData
                 )
             )
         }

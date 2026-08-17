@@ -15,6 +15,14 @@ final class AppSettings: ObservableObject {
         static let notificationMinute = "BirthdayPal.notificationMinute"
         static let notificationsEnabled = "BirthdayPal.notificationsEnabled"
         static let showAgeTurning = "BirthdayPal.showAgeTurning"
+        static let initialPingDays = "BirthdayPal.initialPingDays"
+    }
+
+    /// Extra reminder N days before the birthday. `0` (or empty in Settings) means Off.
+    static let initialPingDaysMax = 60
+
+    static func clampedInitialPingDays(_ days: Int) -> Int {
+        min(max(days, 0), initialPingDaysMax)
     }
 
     /// Replace with the real App Store ID after publish.
@@ -44,6 +52,18 @@ final class AppSettings: ObservableObject {
 
     @Published var showAgeTurning: Bool {
         didSet { UserDefaults.standard.set(showAgeTurning, forKey: Keys.showAgeTurning) }
+    }
+
+    /// Extra reminder N days before the birthday. `0` disables the initial ping (day-of still fires).
+    @Published var initialPingDays: Int {
+        didSet {
+            let clamped = Self.clampedInitialPingDays(initialPingDays)
+            if clamped != initialPingDays {
+                initialPingDays = clamped
+                return
+            }
+            UserDefaults.standard.set(initialPingDays, forKey: Keys.initialPingDays)
+        }
     }
 
     /// Binding-friendly date whose hour/minute drive notification time.
@@ -88,6 +108,11 @@ final class AppSettings: ObservableObject {
             showAgeTurning = true
         } else {
             showAgeTurning = defaults.bool(forKey: Keys.showAgeTurning)
+        }
+        if defaults.object(forKey: Keys.initialPingDays) == nil {
+            initialPingDays = 0
+        } else {
+            initialPingDays = Self.clampedInitialPingDays(defaults.integer(forKey: Keys.initialPingDays))
         }
     }
 }
