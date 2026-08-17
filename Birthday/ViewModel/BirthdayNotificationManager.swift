@@ -1,8 +1,12 @@
 import Foundation
 import UserNotifications
 
-/// Schedules *one* local notification at a chosen time (default 9:00)
-/// for each person whose birthday is *today*. Uses stable identifiers to avoid duplicates.
+/// Schedules local notifications at the user's chosen fire time for:
+/// - people whose birthday is **today** (always, when notifications are on)
+/// - people whose birthday is in **X days**, when an initial ping is enabled
+///
+/// This is the live scheduler (called after contact load). `NotificationsManager.refreshBirthdayNotifications`
+/// is unused and must stay unused so we do not create a second annual stack.
 final class BirthdayNotificationManager {
     static let shared = BirthdayNotificationManager()
 
@@ -20,73 +24,91 @@ final class BirthdayNotificationManager {
         }
     }
 
-    /// Idempotent: safe to call on every app launch. It re-schedules only *today’s* 9:00 notifications.
+    /// Idempotent daily refresh using `AppSettings` fire time and initial-ping days.
+    func refreshDailySchedule(contacts: [Contact]) {
+        let settings = AppSettings.shared
+        refreshDailySchedule(
+            contacts: contacts,
+            fireHour: settings.notificationHour,
+            fireMinute: settings.notificationMinute,
+            initialPingDays: settings.initialPingDays
+        )
+    }
+
+    /// Idempotent: safe to call on every app launch. Schedules today's fire-time notifications
+    /// for day-of birthdays and, when `initialPingDays > 0`, birthdays that are exactly that many days out.
     func refreshDailySchedule(
         contacts: [Contact],
-        fireHour: Int = 9,
-        fireMinute: Int = 0
+        fireHour: Int,
+        fireMinute: Int,
+        initialPingDays: Int
     ) {
         let todayYMD = Self.ymdString(Date())
-        // If we've already scheduled today AND our IDs are stable, we can skip.
-        // Still, we re-create requests after cleaning duplicates so multiple calls stay idempotent.
-        if UserDefaults.standard.string(forKey: lastScheduledKey) == todayYMD {
-            // We’ll still dedupe below; early return here is optional.
-            // return
+        let dayOfContacts = contacts.filter { $0.daysToBirthday == 0 }
+        let pingDays = AppSettings.clampedInitialPingDays(initialPingDays)
+        let comingUpContacts: [Contact]
+        if pingDays > 0 {
+            comingUpContacts = contacts.filter { $0.daysToBirthday == pingDays }
+        } else {
+            comingUpContacts = []
         }
 
-        let todaysContacts = contacts.filter { $0.daysToBirthday == 0 }
+        let dayOfIDs = dayOfContacts.map { Self.notificationId(for: $0, on: Date(), kind: .dayOf, prefix: idPrefix) }
+        let comingUpIDs = comingUpContacts.map { Self.notificationId(for: $0, on: Date(), kind: .comingUp, prefix: idPrefix) }
+        let intendedIDs = Set(dayOfIDs + comingUpIDs)
 
-        // Build all the identifiers we intend to use (one per contact)
-        let ids = todaysContacts.map { Self.notificationId(for: $0, on: Date(), prefix: idPrefix) }
+        UNUserNotificationCenter.current().getPendingNotificationRequests { [idPrefix] requests in
+            let ours = requests.map(\.identifier).filter { $0.hasPrefix(idPrefix) }
+            // Drop leftovers (e.g. ping days changed) so we don't stack duplicates.
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ours)
 
-        // Remove any existing requests *for these same IDs* so we replace instead of duping
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ids)
-
-        // Schedule (only if there are birthdays today)
-        guard !todaysContacts.isEmpty else {
-            UserDefaults.standard.set(todayYMD, forKey: lastScheduledKey)
-            return
-        }
-
-        let now = Date()
-        let calendar = Calendar.current
-        var dateComponents = calendar.dateComponents([.year, .month, .day], from: now)
-        dateComponents.hour = fireHour
-        dateComponents.minute = fireMinute
-
-        // If it's already past the fire time today, deliver immediately (3s) instead of missing the day
-        let alreadyPastFireTime: Bool = {
-            if let at = calendar.date(from: dateComponents) {
-                return now >= at
-            }
-            return false
-        }()
-
-        for contact in todaysContacts {
-            let title = "🎂 Birthday today"
-            let name = contact.name
-            let body = "It's \(name)'s birthday today!"
-
-            let content = UNMutableNotificationContent()
-            content.title = title
-            content.body = body
-            content.sound = .default
-
-            let requestId = Self.notificationId(for: contact, on: now, prefix: idPrefix)
-
-            let trigger: UNNotificationTrigger
-            if alreadyPastFireTime {
-                trigger = UNTimeIntervalNotificationTrigger(timeInterval: 3, repeats: false)
-            } else {
-                let t = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: false)
-                trigger = t
+            guard !dayOfContacts.isEmpty || !comingUpContacts.isEmpty else {
+                UserDefaults.standard.set(todayYMD, forKey: self.lastScheduledKey)
+                return
             }
 
-            let request = UNNotificationRequest(identifier: requestId, content: content, trigger: trigger)
-            UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
-        }
+            let now = Date()
+            let calendar = Calendar.current
+            var dateComponents = calendar.dateComponents([.year, .month, .day], from: now)
+            dateComponents.hour = fireHour
+            dateComponents.minute = fireMinute
 
-        UserDefaults.standard.set(todayYMD, forKey: lastScheduledKey)
+            let alreadyPastFireTime: Bool = {
+                if let at = calendar.date(from: dateComponents) {
+                    return now >= at
+                }
+                return false
+            }()
+
+            func addRequest(contact: Contact, kind: NotificationKind) {
+                let content = UNMutableNotificationContent()
+                content.title = kind.title
+                content.body = kind.body(for: contact.name, daysUntil: pingDays)
+                content.sound = .default
+
+                let requestId = Self.notificationId(for: contact, on: now, kind: kind, prefix: idPrefix)
+                guard intendedIDs.contains(requestId) else { return }
+
+                let trigger: UNNotificationTrigger
+                if alreadyPastFireTime {
+                    trigger = UNTimeIntervalNotificationTrigger(timeInterval: 3, repeats: false)
+                } else {
+                    trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: false)
+                }
+
+                let request = UNNotificationRequest(identifier: requestId, content: content, trigger: trigger)
+                UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
+            }
+
+            for contact in dayOfContacts {
+                addRequest(contact: contact, kind: .dayOf)
+            }
+            for contact in comingUpContacts {
+                addRequest(contact: contact, kind: .comingUp)
+            }
+
+            UserDefaults.standard.set(todayYMD, forKey: self.lastScheduledKey)
+        }
     }
 
     /// Optional helper to remove only our birthday notifications (does not clear other app notifications).
@@ -95,6 +117,12 @@ final class BirthdayNotificationManager {
             let ours = requests.map(\.identifier).filter { $0.hasPrefix(self.idPrefix) }
             UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ours)
         }
+        UserDefaults.standard.removeObject(forKey: lastScheduledKey)
+    }
+
+    /// Clears the "already scheduled today" marker so the next refresh re-creates triggers (e.g. after time change).
+    func invalidateDailyScheduleMarker() {
+        UserDefaults.standard.removeObject(forKey: lastScheduledKey)
     }
 
     /// Debug print
@@ -109,6 +137,37 @@ final class BirthdayNotificationManager {
 
     // MARK: Helpers
 
+    private enum NotificationKind {
+        case dayOf
+        case comingUp
+
+        var idToken: String {
+            switch self {
+            case .dayOf: return "today"
+            case .comingUp: return "soon"
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .dayOf: return "Birthday today"
+            case .comingUp: return "Birthday coming up"
+            }
+        }
+
+        func body(for name: String, daysUntil: Int) -> String {
+            switch self {
+            case .dayOf:
+                return "It's \(name)'s birthday today"
+            case .comingUp:
+                if daysUntil == 1 {
+                    return "\(name)'s birthday is in 1 day"
+                }
+                return "\(name)'s birthday is in \(daysUntil) days"
+            }
+        }
+    }
+
     private static func ymdString(_ date: Date) -> String {
         let df = DateFormatter()
         df.calendar = Calendar(identifier: .gregorian)
@@ -118,15 +177,20 @@ final class BirthdayNotificationManager {
         return df.string(from: date)
     }
 
-    /// Stable, human-readable ID per contact per day: "bday-<sanitized-name>-MMDD-YYYY"
-    private static func notificationId(for contact: Contact, on date: Date, prefix: String) -> String {
+    /// Stable ID per contact per day per kind: "bday-today-<name>-MMDD-YYYY"
+    private static func notificationId(
+        for contact: Contact,
+        on date: Date,
+        kind: NotificationKind,
+        prefix: String
+    ) -> String {
         let cal = Calendar.current
         let comps = cal.dateComponents([.year, .month, .day], from: date)
         let y = comps.year ?? 0
         let m = comps.month ?? 0
         let d = comps.day ?? 0
         let name = sanitize(contact.name)
-        return "\(prefix)\(name)-\(String(format: "%02d%02d-%04d", m, d, y))"
+        return "\(prefix)\(kind.idToken)-\(name)-\(String(format: "%02d%02d-%04d", m, d, y))"
     }
 
     private static func sanitize(_ s: String) -> String {

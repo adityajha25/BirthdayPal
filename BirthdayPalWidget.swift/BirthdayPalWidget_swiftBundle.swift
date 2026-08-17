@@ -7,5 +7,6 @@ struct BirthdayPalWidgetBundle: WidgetBundle {
     var body: some Widget {
         RememberedBirthdaysWidget()
         UpcomingBirthdayWidget()
+        TodaysBirthdaysControl()
     }
 }

@@ -14,6 +14,9 @@ final class BirthdayMessageViewModel: ObservableObject {
     @Published var lastError: String?
     private let llmService = BirthdayLLMService()
     @Published var isGenerating: Bool = false
+    /// Soft notice after generation (guardrail, fallback, etc.).
+    @Published var generationNotice: String?
+
     func startBirthdayFlow(with contacts: [CNContact]) {
         guard !contacts.isEmpty else {
             lastError = "No contact selected"
@@ -34,18 +37,25 @@ final class BirthdayMessageViewModel: ObservableObject {
         }
         showTemplatePicker = true
     }
+
     func generateMessageText(
-        tone: MessageTone,
+        tone: MessageTone?,
         name: String,
         age: Int?,
-        userHint: String?
+        userHint: String?,
+        previousMessageToAvoid: String? = nil
     ) async -> String {
-        await llmService.generateMessage(
+        let outcome = await llmService.generateMessage(
             tone: tone,
             name: name,
             ageOrYear: age,
-            userHint: userHint
+            userHint: userHint,
+            previousMessageToAvoid: previousMessageToAvoid
         )
+        await MainActor.run {
+            generationNotice = outcome.notice
+        }
+        return outcome.text
     }
 
     func composerFinished() {

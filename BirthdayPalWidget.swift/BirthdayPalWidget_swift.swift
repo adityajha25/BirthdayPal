@@ -4,6 +4,7 @@
 
 import WidgetKit
 import SwiftUI
+import UIKit
 
 // MARK: - Timeline entry
 
@@ -42,48 +43,57 @@ struct Provider: TimelineProvider {
 // MARK: - View 1: Remembered birthdays
 
 struct RememberedBirthdaysWidgetView: View {
+    @Environment(\.widgetFamily) private var family
     var entry: BirthdayWidgetEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Image(systemName: "sparkles")
-                    .foregroundColor(.yellow)
-                    .font(.caption)
-                Text("Birthdays Remembered")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white.opacity(0.8))
-            }
+        VStack(alignment: .leading, spacing: family == .systemSmall ? 6 : 8) {
+            Label(
+                family == .systemSmall ? "Remembered" : "Birthdays Remembered",
+                systemImage: "sparkles"
+            )
+            .font(.caption)
+            .fontWeight(.medium)
+            .foregroundColor(.white.opacity(0.8))
+            .labelStyle(.titleAndIcon)
+            .lineLimit(1)
+            .minimumScaleFactor(0.85)
 
             HStack(alignment: .lastTextBaseline, spacing: 6) {
                 Text("\(entry.data.rememberedCount)")
-                    .font(.system(size: 44, weight: .bold))
+                    .font(.system(size: family == .systemSmall ? 36 : 44, weight: .bold))
                     .foregroundColor(.cyan)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 Text("this year")
-                    .font(.subheadline)
+                    .font(family == .systemSmall ? .caption : .subheadline)
                     .foregroundColor(.white.opacity(0.9))
+                    .lineLimit(1)
             }
 
-            Spacer()
+            Spacer(minLength: 0)
 
-            if entry.data.rememberedCount == 0 {
-                Text("Start sending messages 🎉")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.6))
-            } else if entry.data.rememberedCount < 10 {
-                Text("Nice start – keep going! 🎂")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.6))
-            } else {
-                Text("You're a birthday pro 🥳")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.6))
-            }
+            Text(footerCopy)
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.65))
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(16)
+        .padding(family == .systemSmall ? 12 : 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .containerBackground(for: .widget) {
             Color(red: 0.08, green: 0.12, blue: 0.28)
+        }
+        .widgetURL(entry.data.personDeepLinkURL)
+    }
+
+    private var footerCopy: String {
+        if entry.data.rememberedCount == 0 {
+            return "Send a birthday message"
+        } else if entry.data.rememberedCount < 10 {
+            return "Nice start — keep going"
+        } else {
+            return "You're a birthday pro"
         }
     }
 }
@@ -91,68 +101,157 @@ struct RememberedBirthdaysWidgetView: View {
 // MARK: - View 2: Upcoming birthday
 
 struct UpcomingBirthdayWidgetView: View {
+    @Environment(\.widgetFamily) private var family
     var entry: BirthdayWidgetEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                Text("🎂")
-                    .font(.caption)
-                Text("Upcoming Birthday")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white.opacity(0.8))
+        Group {
+            if family == .systemSmall {
+                smallLayout
+            } else {
+                mediumLayout
             }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .containerBackground(for: .widget) {
+            Color(red: 0.08, green: 0.12, blue: 0.28)
+        }
+        .widgetURL(entry.data.personDeepLinkURL)
+    }
+
+    private var smallLayout: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label("Upcoming", systemImage: "birthday.cake.fill")
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .foregroundColor(.white.opacity(0.8))
+                .labelStyle(.titleAndIcon)
+                .lineLimit(1)
 
             if let name = entry.data.nextName,
                let days = entry.data.daysToNext {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(name)
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
+                HStack(alignment: .top, spacing: 8) {
+                    WidgetContactPhoto(data: entry.data.nextThumbnail, size: 32)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(name)
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.85)
+                            .fixedSize(horizontal: false, vertical: true)
 
-                    HStack(spacing: 6) {
-                        if days == 0 {
-                            Image(systemName: "party.popper.fill")
-                                .foregroundColor(.yellow)
-                                .font(.caption)
-                            Text("Today!")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.yellow)
-                        } else {
-                            Image(systemName: "clock.fill")
-                                .foregroundColor(.cyan)
-                                .font(.caption2)
-                            Text("In \(days) day\(days == 1 ? "" : "s")")
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.9))
-                        }
+                        Text(daysLabel(days))
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(days == 0 ? .yellow : .cyan)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.9)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(Color(red: 0.12, green: 0.16, blue: 0.35).opacity(0.6))
-                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                Text("No upcoming birthdays")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.7))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+
+            Text("\(entry.data.upcomingThisMonth) this month")
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.6))
+                .lineLimit(1)
+        }
+        .padding(12)
+    }
+
+    private var mediumLayout: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Upcoming Birthday", systemImage: "birthday.cake.fill")
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(.white.opacity(0.8))
+                .labelStyle(.titleAndIcon)
+                .lineLimit(1)
+
+            if let name = entry.data.nextName,
+               let days = entry.data.daysToNext {
+                HStack(alignment: .center, spacing: 12) {
+                    WidgetContactPhoto(data: entry.data.nextThumbnail, size: 48)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(name)
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+
+                        Text(daysLabel(days))
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(days == 0 ? .yellow : .white.opacity(0.9))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule()
+                                    .fill(Color(red: 0.12, green: 0.16, blue: 0.35).opacity(0.6))
+                            )
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             } else {
                 Text("No upcoming birthdays")
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.7))
+                    .lineLimit(2)
             }
 
-            Spacer()
+            Spacer(minLength: 0)
 
             Text("\(entry.data.upcomingThisMonth) this month")
                 .font(.caption)
                 .foregroundColor(.white.opacity(0.6))
+                .lineLimit(1)
         }
         .padding(16)
-        .containerBackground(for: .widget) {
-            Color(red: 0.08, green: 0.12, blue: 0.28)
+    }
+
+    private func daysLabel(_ days: Int) -> String {
+        if days == 0 { return "Today!" }
+        if days == 1 { return "In 1 day" }
+        return "In \(days) days"
+    }
+}
+
+private struct WidgetContactPhoto: View {
+    let data: Data?
+    let size: CGFloat
+
+    var body: some View {
+        Group {
+            if let data, let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                ZStack {
+                    Circle()
+                        .fill(Color(red: 0.15, green: 0.2, blue: 0.4))
+                    Image(systemName: "person.fill")
+                        .font(.system(size: size * 0.42, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.75))
+                }
+            }
         }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        .overlay(
+            Circle().stroke(Color.white.opacity(0.28), lineWidth: 1)
+        )
     }
 }
 

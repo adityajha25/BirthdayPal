@@ -31,10 +31,9 @@ final class NotificationsManager: NSObject, UNUserNotificationCenterDelegate {
         completionHandler([.banner, .sound, .list])
     }
 
-    /// Rebuild all birthday notifications from your contacts.
-    /// - Parameters:
-    ///   - contacts: your `Contact` models
-    ///   - fireHour/minute: daily time to notify (local time)
+    /// Unused annual repeating scheduler. Do **not** call this from app launch or contact load —
+    /// `BirthdayNotificationManager.refreshDailySchedule` is the live path and would duplicate
+    /// if both stacks were armed.
     func refreshBirthdayNotifications(
         contacts: [Contact],
         fireHour: Int = 19,
@@ -50,11 +49,10 @@ final class NotificationsManager: NSObject, UNUserNotificationCenterDelegate {
             center.removePendingNotificationRequests(withIdentifiers: toRemove)
 
             for contact in contacts {
-                guard
-                    let comps = contact.birthday,
-                    let month = comps.month,
-                    let day = comps.day
-                else { continue }
+                // Feb 29 birthdays notify on Feb 28 so the trigger exists every year
+                guard let monthDay = contact.notificationMonthDay else { continue }
+                let month = monthDay.month
+                let day = monthDay.day
 
                 // Stable identifier per contact (adjust if your Contact has a real `id`)
                 let baseID = "bday.\(self.identifierKey(for: contact))"
@@ -69,7 +67,7 @@ final class NotificationsManager: NSObject, UNUserNotificationCenterDelegate {
                 let trigger = UNCalendarNotificationTrigger(dateMatching: triggerComps, repeats: true)
 
                 let content = UNMutableNotificationContent()
-                content.title = "🎂 It’s \(contact.name)’s birthday!"
+                content.title = "It’s \(contact.name)’s birthday!"
                 content.body = "Send them a quick message."
                 content.sound = .default
                 content.threadIdentifier = "birthday"
@@ -77,9 +75,9 @@ final class NotificationsManager: NSObject, UNUserNotificationCenterDelegate {
                 let request = UNNotificationRequest(identifier: baseID, content: content, trigger: trigger)
                 center.add(request)
 
-                // If their birthday is TODAY and the scheduled time already passed,
+                // If their observed birthday is TODAY and the scheduled time already passed,
                 // also fire a one-off notification immediately so you don’t miss it.
-                if self.isToday(month: month, day: day) && self.hasTodayTimePassed(hour: fireHour, minute: fireMinute) {
+                if contact.daysToBirthday == 0 && self.hasTodayTimePassed(hour: fireHour, minute: fireMinute) {
                     let instant = UNTimeIntervalNotificationTrigger(timeInterval: 10, repeats: false)
                     let nowRequest = UNNotificationRequest(
                         identifier: baseID + ".now",
@@ -100,11 +98,6 @@ final class NotificationsManager: NSObject, UNUserNotificationCenterDelegate {
         let m = contact.birthday?.month ?? 0
         let d = contact.birthday?.day ?? 0
         return "\(contact.name)|\(m)-\(d)"
-    }
-
-    private func isToday(month: Int, day: Int) -> Bool {
-        let today = Calendar.current.dateComponents([.month, .day], from: Date())
-        return today.month == month && today.day == day
     }
 
     private func hasTodayTimePassed(hour: Int, minute: Int) -> Bool {
