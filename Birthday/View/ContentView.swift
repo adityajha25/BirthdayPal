@@ -887,28 +887,9 @@ struct addMissingView: View {
                         addMissingSearchBar(text: $searchText)
                             .padding(.horizontal, 20)
 
-                        if filteredContacts.isEmpty {
-                            GlassCard {
-                                VStack(spacing: 12) {
-                                    Image(systemName: "magnifyingglass")
-                                        .font(.system(size: 36))
-                                        .foregroundStyle(.cyan)
-                                    Text("No Matches")
-                                        .font(.title3)
-                                        .fontWeight(.bold)
-                                        .foregroundStyle(.white)
-                                    Text("Try a different name")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.white.opacity(0.7))
-                                }
-                                .padding(28)
-                            }
-                            .padding(.horizontal, 20)
-                        } else {
-                            ForEach(filteredContacts) { contact in
-                                addMissingCard(contact: contact) {
-                                    editingContactID = ContactSheetTarget(id: contact.id)
-                                }
+                        ForEach(filteredContacts) { contact in
+                            addMissingCard(contact: contact) {
+                                editingContactID = ContactSheetTarget(id: contact.id)
                             }
                         }
                     }
