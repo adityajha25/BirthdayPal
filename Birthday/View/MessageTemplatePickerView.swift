@@ -374,11 +374,18 @@ struct MessageTemplatePickerView: View {
     private func calculateAge(from birthday: DateComponents?) -> Int? {
         guard
             let birthday,
-            birthday.year != nil,
-            let dob = Calendar.current.date(from: birthday)
+            let year = Contact.validBirthYear(birthday.year),
+            let month = birthday.month,
+            let day = birthday.day
         else {
             return nil
         }
-        return Calendar.current.dateComponents([.year], from: dob, to: Date()).year
+        var comps = DateComponents()
+        comps.year = year
+        comps.month = month
+        comps.day = day
+        guard let dob = Calendar.current.date(from: comps) else { return nil }
+        let age = Calendar.current.dateComponents([.year], from: dob, to: Date()).year
+        return (age ?? 0) > 0 ? age : nil
     }
 }

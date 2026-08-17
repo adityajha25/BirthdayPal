@@ -53,12 +53,24 @@ struct Contact: Identifiable, Hashable {
 
     /// Age the person will turn on their next birthday. `nil` when birth year is unknown.
     var ageTurning: Int? {
-        if cachedAgeTurning != nil { return cachedAgeTurning }
-        guard let birthYear = birthday?.year,
+        if let cachedAgeTurning { return cachedAgeTurning }
+        guard let birthYear = Self.validBirthYear(birthday?.year),
               let next = comparableBirthday else { return nil }
         let nextYear = Calendar.current.component(.year, from: next)
         let age = nextYear - birthYear
         return age > 0 ? age : nil
+    }
+
+    /// True when Contacts provided a real birth year (not missing / placeholder).
+    var hasKnownBirthYear: Bool {
+        Self.validBirthYear(birthday?.year) != nil
+    }
+
+    static func validBirthYear(_ year: Int?) -> Int? {
+        guard let year else { return nil }
+        let currentYear = Calendar.current.component(.year, from: Date())
+        guard (1900...currentYear).contains(year) else { return nil }
+        return year
     }
 
     /// Month/day for display badges (uses a leap year so Feb 29 always formats).
@@ -128,7 +140,7 @@ struct Contact: Identifiable, Hashable {
         } else {
             copy.cachedDaysUntil = nil
         }
-        if let birthYear = birthday?.year, let next {
+        if let birthYear = Self.validBirthYear(birthday?.year), let next {
             let age = calendar.component(.year, from: next) - birthYear
             copy.cachedAgeTurning = age > 0 ? age : nil
         } else {
@@ -162,12 +174,77 @@ class ContactsManager {
         scope: ContactFetchScope,
         completion: @escaping (Result<[Contact], Error>) -> Void
     ) {
+        requestContactsAccess { result in
+            switch result {
+            case .failure(let error):
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+            case .success:
+                DispatchQueue.global(qos: .userInitiated).async {
+                    do {
+                        let contacts = try self.performContactsEnumeration(scope: scope)
+                        let enriched = contacts.map { $0.enrichingCaches() }
+                        let sorted: [Contact]
+                        switch scope {
+                        case .withBirthdaysOnly:
+                            sorted = enriched.sorted {
+                                ($0.cachedDaysUntil ?? Int.max) < ($1.cachedDaysUntil ?? Int.max)
+                            }
+                        case .missingBirthdaysOnly:
+                            sorted = enriched.sorted {
+                                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                            }
+                        }
+                        DispatchQueue.main.async {
+                            completion(.success(sorted))
+                        }
+                    } catch {
+                        DispatchQueue.main.async {
+                            completion(.failure(error))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Writes a birthday to the system Contacts database for the given contact identifier.
+    func saveBirthday(
+        contactIdentifier: String,
+        components: DateComponents,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        requestContactsAccess { result in
+            switch result {
+            case .failure(let error):
+                DispatchQueue.main.async { completion(.failure(error)) }
+            case .success:
+                DispatchQueue.global(qos: .userInitiated).async {
+                    do {
+                        try self.performBirthdaySave(
+                            contactIdentifier: contactIdentifier,
+                            components: components
+                        )
+                        DispatchQueue.main.async {
+                            completion(.success(()))
+                        }
+                    } catch {
+                        DispatchQueue.main.async {
+                            completion(.failure(error))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func requestContactsAccess(completion: @escaping (Result<Void, Error>) -> Void) {
         contactStore.requestAccess(for: .contacts) { granted, error in
-            if let error = error {
+            if let error {
                 completion(.failure(error))
                 return
             }
-
             guard granted else {
                 completion(.failure(NSError(
                     domain: "ContactsManager",
@@ -176,37 +253,37 @@ class ContactsManager {
                 )))
                 return
             }
-
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    let contacts = try self.performContactsEnumeration(scope: scope)
-                    let enriched = contacts.map { $0.enrichingCaches() }
-                    let sorted: [Contact]
-                    switch scope {
-                    case .withBirthdaysOnly:
-                        sorted = enriched.sorted {
-                            ($0.cachedDaysUntil ?? Int.max) < ($1.cachedDaysUntil ?? Int.max)
-                        }
-                    case .missingBirthdaysOnly:
-                        sorted = enriched.sorted {
-                            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
-                        }
-                    }
-                    DispatchQueue.main.async {
-                        completion(.success(sorted))
-                    }
-                } catch {
-                    DispatchQueue.main.async {
-                        completion(.failure(error))
-                    }
-                }
-            }
+            completion(.success(()))
         }
+    }
+
+    /// Fetches a mutable contact and saves birthday via CNSaveRequest. Call off the main thread.
+    private func performBirthdaySave(contactIdentifier: String, components: DateComponents) throws {
+        let keysToFetch: [CNKeyDescriptor] = [
+            CNContactIdentifierKey as CNKeyDescriptor,
+            CNContactBirthdayKey as CNKeyDescriptor
+        ]
+        let cnContact = try contactStore.unifiedContact(
+            withIdentifier: contactIdentifier,
+            keysToFetch: keysToFetch
+        )
+        guard let mutableContact = cnContact.mutableCopy() as? CNMutableContact else {
+            throw NSError(
+                domain: "ContactsManager",
+                code: 500,
+                userInfo: [NSLocalizedDescriptionKey: "Could not update this contact"]
+            )
+        }
+        mutableContact.birthday = components
+        let saveRequest = CNSaveRequest()
+        saveRequest.update(mutableContact)
+        try contactStore.execute(saveRequest)
     }
 
     /// Performs the actual contact enumeration. Must be called off the main thread.
     private func performContactsEnumeration(scope: ContactFetchScope) throws -> [Contact] {
         let keysToFetch: [CNKeyDescriptor] = [
+            CNContactIdentifierKey as CNKeyDescriptor,
             CNContactGivenNameKey as CNKeyDescriptor,
             CNContactFamilyNameKey as CNKeyDescriptor,
             CNContactPhoneNumbersKey as CNKeyDescriptor,

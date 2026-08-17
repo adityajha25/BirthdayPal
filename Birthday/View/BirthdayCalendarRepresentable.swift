@@ -7,6 +7,7 @@ import SwiftUI
 import UIKit
 
 /// UICalendarView wrapper that draws dots on days with birthdays.
+/// Hosted in a container so intrinsic size cannot blow past screen width inside ScrollView.
 @available(iOS 17.0, *)
 struct BirthdayCalendarRepresentable: UIViewRepresentable {
     @Binding var selectedDate: Date
@@ -16,13 +17,20 @@ struct BirthdayCalendarRepresentable: UIViewRepresentable {
         Coordinator(self)
     }
 
-    func makeUIView(context: Context) -> UICalendarView {
+    func makeUIView(context: Context) -> UIView {
+        let container = UIView()
+        container.backgroundColor = .clear
+        container.clipsToBounds = true
+
         let calendarView = UICalendarView()
+        calendarView.translatesAutoresizingMaskIntoConstraints = false
         calendarView.delegate = context.coordinator
         calendarView.calendar = Calendar.current
         calendarView.locale = .current
         calendarView.tintColor = .systemCyan
         calendarView.overrideUserInterfaceStyle = .dark
+        calendarView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        calendarView.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         let selection = UICalendarSelectionSingleDate(delegate: context.coordinator)
         calendarView.selectionBehavior = selection
@@ -31,14 +39,30 @@ struct BirthdayCalendarRepresentable: UIViewRepresentable {
             animated: false
         )
 
-        return calendarView
+        container.addSubview(calendarView)
+        NSLayoutConstraint.activate([
+            calendarView.topAnchor.constraint(equalTo: container.topAnchor),
+            calendarView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            calendarView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            calendarView.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+        ])
+
+        context.coordinator.calendarView = calendarView
+        return container
     }
 
-    func updateUIView(_ uiView: UICalendarView, context: Context) {
+    func updateUIView(_ uiView: UIView, context: Context) {
         context.coordinator.parent = self
-        // Refresh decorations for the visible month around the selected date
+        guard let calendarView = context.coordinator.calendarView else { return }
         let comps = monthDateComponents(around: selectedDate)
-        uiView.reloadDecorations(forDateComponents: comps, animated: false)
+        calendarView.reloadDecorations(forDateComponents: comps, animated: false)
+
+        if let selection = calendarView.selectionBehavior as? UICalendarSelectionSingleDate {
+            let selected = Calendar.current.dateComponents([.year, .month, .day], from: selectedDate)
+            if selection.selectedDate != selected {
+                selection.setSelected(selected, animated: false)
+            }
+        }
     }
 
     private func monthDateComponents(around date: Date) -> [DateComponents] {
@@ -56,6 +80,7 @@ struct BirthdayCalendarRepresentable: UIViewRepresentable {
 
     final class Coordinator: NSObject, UICalendarViewDelegate, UICalendarSelectionSingleDateDelegate {
         var parent: BirthdayCalendarRepresentable
+        weak var calendarView: UICalendarView?
 
         init(_ parent: BirthdayCalendarRepresentable) {
             self.parent = parent

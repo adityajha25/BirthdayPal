@@ -132,8 +132,39 @@ final class ContactViewModel: ObservableObject {
             ?? contactsWithoutBirthday.first { $0.id == id }
     }
 
-    /// Saves an in-memory birthday on a missing contact and promotes them into the birthday list.
-    func assignBirthday(contactID: String, components: DateComponents) {
+    /// Persists a birthday to system Contacts, then promotes the contact in app state.
+    /// Completion is always invoked on the main thread.
+    func assignBirthday(
+        contactID: String,
+        components: DateComponents,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        guard contactsWithoutBirthday.contains(where: { $0.id == contactID }) else {
+            completion(.failure(NSError(
+                domain: "ContactViewModel",
+                code: 404,
+                userInfo: [NSLocalizedDescriptionKey: "Contact not found in missing birthdays"]
+            )))
+            return
+        }
+
+        contactsManager.saveBirthday(
+            contactIdentifier: contactID,
+            components: components
+        ) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .failure(let error):
+                completion(.failure(error))
+            case .success:
+                self.promoteAssignedBirthday(contactID: contactID, components: components)
+                completion(.success(()))
+            }
+        }
+    }
+
+    /// Moves a contact from the missing list into the birthday list after a successful Contacts save.
+    private func promoteAssignedBirthday(contactID: String, components: DateComponents) {
         guard let index = contactsWithoutBirthday.firstIndex(where: { $0.id == contactID }) else { return }
         var contact = contactsWithoutBirthday.remove(at: index)
         contact.birthday = components

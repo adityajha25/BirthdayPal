@@ -16,6 +16,7 @@ struct ContentView: View {
 struct LandingPage: View {
     @StateObject private var contactsVM = ContactViewModel()
     @State private var path = NavigationPath()
+    @State private var comingUpScrollID: String?
 
     private enum Route: Hashable {
         case browse
@@ -24,6 +25,9 @@ struct LandingPage: View {
         case settings
         case todaysBirthdays
     }
+
+    private let comingUpCardWidth: CGFloat = 200
+    private let comingUpCardSpacing: CGFloat = 16
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -141,18 +145,14 @@ struct LandingPage: View {
                                         }
                                         .padding(.horizontal, 24)
                                         
-                                        ScrollView(.horizontal, showsIndicators: false) {
-                                            LazyHStack(spacing: 16) {
-                                                ForEach(contactsVM.upcomingPreview) { contact in
-                                                    Button {
-                                                        path.append(Route.edit(contact.id))
-                                                    } label: {
-                                                        CompactBdayCard(contact: contact)
-                                                    }
-                                                    .buttonStyle(PlainButtonStyle())
-                                                }
-                                            }
-                                            .padding(.horizontal, 24)
+                                        ComingUpCarousel(
+                                            contacts: contactsVM.upcomingPreview,
+                                            scrollID: $comingUpScrollID,
+                                            cardWidth: comingUpCardWidth,
+                                            spacing: comingUpCardSpacing,
+                                            containerWidth: geometry.size.width
+                                        ) { contactID in
+                                            path.append(Route.edit(contactID))
                                         }
                                     }
                                 }
@@ -389,6 +389,65 @@ struct GlassCard<Content: View>: View {
     }
 }
 
+// MARK: - Coming Up Carousel
+
+@available(iOS 17.0, *)
+private struct ComingUpCarousel: View {
+    let contacts: [Contact]
+    @Binding var scrollID: String?
+    let cardWidth: CGFloat
+    let spacing: CGFloat
+    let containerWidth: CGFloat
+    let onSelect: (String) -> Void
+
+    private var sideInset: CGFloat {
+        max((containerWidth - cardWidth) / 2, 24)
+    }
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: spacing) {
+                ForEach(contacts) { contact in
+                    Button {
+                        onSelect(contact.id)
+                    } label: {
+                        CompactBdayCard(contact: contact)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(width: cardWidth)
+                    .id(contact.id)
+                    .scrollTransition(.interactive, axis: .horizontal) { content, phase in
+                        content
+                            .scaleEffect(1 - (min(abs(phase.value), 1) * 0.12))
+                            .opacity(1 - (min(abs(phase.value), 1) * 0.12))
+                    }
+                }
+            }
+            .scrollTargetLayout()
+        }
+        .scrollTargetBehavior(.viewAligned)
+        .scrollPosition(id: $scrollID)
+        .contentMargins(.horizontal, sideInset, for: .scrollContent)
+        .frame(height: 260)
+        .onAppear {
+            syncScrollID()
+        }
+        .onChange(of: contacts.map(\.id)) { _, _ in
+            syncScrollID()
+        }
+    }
+
+    private func syncScrollID() {
+        guard let firstID = contacts.first?.id else {
+            scrollID = nil
+            return
+        }
+        if scrollID == nil || !contacts.contains(where: { $0.id == scrollID }) {
+            scrollID = firstID
+        }
+    }
+}
+
 // MARK: - Compact Birthday Card (for horizontal scroll)
 
 struct CompactBdayCard: View {
@@ -432,7 +491,7 @@ struct CompactBdayCard: View {
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
                     
-                    if settings.showAgeTurning, let age = contact.ageTurning {
+                    if settings.showAgeTurning, contact.hasKnownBirthYear, let age = contact.ageTurning {
                         Text("Turning \(age)")
                             .font(.caption)
                             .fontWeight(.semibold)
@@ -622,7 +681,7 @@ struct BdayCard: View {
                         .fontWeight(.bold)
                         .foregroundStyle(.white)
                     
-                    if settings.showAgeTurning, let age = contact.ageTurning {
+                    if settings.showAgeTurning, contact.hasKnownBirthYear, let age = contact.ageTurning {
                         Text("Turning \(age)")
                             .font(.subheadline)
                             .fontWeight(.semibold)
@@ -714,14 +773,14 @@ struct EditView: View {
                         VStack(spacing: 16) {
                             Image(systemName: "birthday.cake.fill")
                                 .font(.system(size: 56))
-                                .foregroundStyle(.cyan)
+                                .foregroundStyle(colorForBirthMonth(birthday.month))
                             
                             Text(formatBirthday(birthday))
                                 .font(.title2)
                                 .fontWeight(.semibold)
                                 .foregroundColor(.white)
                             
-                            if settings.showAgeTurning, let age = contact.ageTurning {
+                            if settings.showAgeTurning, contact.hasKnownBirthYear, let age = contact.ageTurning {
                                 Text("Turning \(age)")
                                     .font(.headline)
                                     .foregroundColor(.white.opacity(0.75))
@@ -804,16 +863,33 @@ struct EditView: View {
     }
 
     private func formatBirthday(_ birthday: DateComponents) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .long
-        if let date = Calendar.current.date(from: birthday) {
-            return formatter.string(from: date)
+        guard let month = birthday.month, let day = birthday.day else {
+            return "Unknown"
         }
-        if let month = birthday.month, let day = birthday.day {
-            let monthName = Calendar.current.monthSymbols[month - 1]
-            return "\(monthName) \(day)"
+        let monthName = Calendar.current.monthSymbols[month - 1]
+        if let year = Contact.validBirthYear(birthday.year) {
+            return "\(monthName) \(day), \(year)"
         }
-        return "Unknown"
+        // No reliable year from Contacts — never show a placeholder like ", 1"
+        return "\(monthName) \(day)"
+    }
+
+    private func colorForBirthMonth(_ month: Int?) -> Color {
+        switch month {
+        case 1:  return Color(red: 0.55, green: 0.75, blue: 0.95) // January — ice blue
+        case 2:  return Color(red: 0.85, green: 0.55, blue: 0.75) // February — blush
+        case 3:  return Color(red: 0.45, green: 0.80, blue: 0.55) // March — spring green
+        case 4:  return Color(red: 0.95, green: 0.70, blue: 0.85) // April — soft pink
+        case 5:  return Color(red: 0.40, green: 0.85, blue: 0.75) // May — mint
+        case 6:  return Color(red: 0.95, green: 0.80, blue: 0.35) // June — sunflower
+        case 7:  return Color(red: 1.00, green: 0.55, blue: 0.35) // July — citrus
+        case 8:  return Color(red: 0.95, green: 0.45, blue: 0.40) // August — coral
+        case 9:  return Color(red: 0.85, green: 0.60, blue: 0.30) // September — amber
+        case 10: return Color(red: 0.90, green: 0.45, blue: 0.25) // October — pumpkin
+        case 11: return Color(red: 0.70, green: 0.50, blue: 0.85) // November — plum
+        case 12: return Color(red: 0.40, green: 0.70, blue: 0.90) // December — winter blue
+        default: return .cyan
+        }
     }
 
     private func convertToCNContact(_ contact: Contact) -> CNContact {
@@ -832,10 +908,23 @@ struct EditView: View {
 
 // MARK: - Add Missing View
 
+private struct AddMissingBirthdayTarget: Identifiable {
+    let id: String
+    let name: String
+}
+
 struct addMissingView: View {
     @ObservedObject var contactsVM: ContactViewModel
-    @State private var editingContactID: String?
-    @State private var showDateSheet = false
+    @State private var birthdayTarget: AddMissingBirthdayTarget?
+    @State private var searchText = ""
+    @State private var clearSearchAfterSuccessfulSave = false
+
+    private var filteredContacts: [Contact] {
+        let contacts = contactsVM.contactsWithoutBirthday
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return contacts }
+        return contacts.filter { $0.name.localizedCaseInsensitiveContains(query) }
+    }
 
     var body: some View {
         ZStack {
@@ -843,7 +932,7 @@ struct addMissingView: View {
                 .ignoresSafeArea()
 
             ScrollView {
-                LazyVStack(spacing: 20) {
+                LazyVStack(spacing: 16) {
                     VStack(spacing: 10) {
                         Image(systemName: "person.crop.circle.badge.plus")
                             .font(.system(size: 40))
@@ -877,10 +966,34 @@ struct addMissingView: View {
                         }
                         .padding(.horizontal, 20)
                     } else {
-                        ForEach(contactsVM.contactsWithoutBirthday) { contact in
-                            addMissingCard(contact: contact) {
-                                editingContactID = contact.id
-                                showDateSheet = true
+                        addMissingSearchBar(text: $searchText)
+                            .padding(.horizontal, 20)
+
+                        if filteredContacts.isEmpty {
+                            GlassCard {
+                                VStack(spacing: 12) {
+                                    Image(systemName: "magnifyingglass")
+                                        .font(.system(size: 36))
+                                        .foregroundStyle(.cyan)
+                                    Text("No Matches")
+                                        .font(.title3)
+                                        .fontWeight(.bold)
+                                        .foregroundStyle(.white)
+                                    Text("Try a different name")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.white.opacity(0.7))
+                                }
+                                .padding(28)
+                            }
+                            .padding(.horizontal, 20)
+                        } else {
+                            ForEach(filteredContacts) { contact in
+                                addMissingCard(contact: contact) {
+                                    birthdayTarget = AddMissingBirthdayTarget(
+                                        id: contact.id,
+                                        name: contact.name
+                                    )
+                                }
                             }
                         }
                     }
@@ -891,15 +1004,58 @@ struct addMissingView: View {
         .task {
             contactsVM.loadMissingBirthdayContactsIfNeeded()
         }
-        .sheet(isPresented: $showDateSheet) {
-            if let editingContactID {
-                addMissingCalendar(
-                    contactName: contactsVM.contact(withId: editingContactID)?.name ?? "Contact",
-                    contactID: editingContactID,
-                    contactsVM: contactsVM
-                )
+        .sheet(item: $birthdayTarget, onDismiss: {
+            if clearSearchAfterSuccessfulSave {
+                searchText = ""
+                clearSearchAfterSuccessfulSave = false
+            }
+        }) { target in
+            addMissingCalendar(
+                contactName: target.name,
+                contactID: target.id,
+                contactsVM: contactsVM,
+                onSaveSucceeded: {
+                    clearSearchAfterSuccessfulSave = true
+                }
+            )
+            .presentationBackground(Color(red: 0.08, green: 0.12, blue: 0.28))
+        }
+    }
+}
+
+private struct addMissingSearchBar: View {
+    @Binding var text: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.white.opacity(0.55))
+
+            TextField("", text: $text, prompt: Text("Search contacts").foregroundColor(.white.opacity(0.45)))
+                .foregroundStyle(.white)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+
+            if !text.isEmpty {
+                Button {
+                    text = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.white.opacity(0.45))
+                }
+                .buttonStyle(.plain)
             }
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(red: 0.12, green: 0.16, blue: 0.35).opacity(0.6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                )
+        )
     }
 }
 
@@ -907,47 +1063,40 @@ struct addMissingCard: View {
     let contact: Contact
     let onAddBirthday: () -> Void
 
-    var phoneNumber: String {
-        contact.phoneNumber ?? "No phone number"
-    }
-
     var body: some View {
         GlassCard(intensity: .strong) {
-            HStack(spacing: 20) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(contact.name)
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
+            HStack(spacing: 12) {
+                Text(contact.name)
+                    .font(.body)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
 
-                    Text(phoneNumber)
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.6))
+                Spacer(minLength: 8)
 
-                    Button(action: onAddBirthday) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "calendar.badge.plus")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                            Text("Add Birthday")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
-                        .background(Color.purple)
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule()
-                                .stroke(Color.white.opacity(0.25), lineWidth: 1.5)
-                        )
-                        .shadow(color: Color.black.opacity(0.3), radius: 12, x: 0, y: 6)
+                Button(action: onAddBirthday) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "calendar.badge.plus")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                        Text("Add Birthday")
+                            .font(.caption)
+                            .fontWeight(.semibold)
                     }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.purple)
+                    .clipShape(Capsule())
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                    )
                 }
-                Spacer()
+                .buttonStyle(.plain)
             }
-            .padding(24)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
         }
         .padding(.horizontal, 20)
     }
@@ -957,61 +1106,114 @@ struct addMissingCalendar: View {
     let contactName: String
     let contactID: String
     @ObservedObject var contactsVM: ContactViewModel
+    var onSaveSucceeded: () -> Void = {}
     @State private var selectedDate = Date()
+    @State private var isSaving = false
+    @State private var saveErrorMessage: String?
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
-        ZStack {
-            Color(red: 0.08, green: 0.12, blue: 0.28)
-                .ignoresSafeArea()
+        NavigationStack {
+            ZStack {
+                Color(red: 0.08, green: 0.12, blue: 0.28)
+                    .ignoresSafeArea()
 
-            VStack(spacing: 24) {
-                VStack(spacing: 8) {
-                    Image(systemName: "calendar.badge.plus")
-                        .font(.system(size: 40))
-                        .foregroundStyle(.cyan)
-                    Text("Add Missing Birthday")
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
+                VStack(spacing: 24) {
+                    VStack(spacing: 8) {
+                        Image(systemName: "calendar.badge.plus")
+                            .font(.system(size: 40))
+                            .foregroundStyle(.cyan)
+                        Text("Add Missing Birthday")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.white)
 
-                    Text("Select a date for \(contactName)")
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.7))
-                }
-                .padding(.top, 40)
-
-                GlassCard(intensity: .strong) {
-                    DatePicker("", selection: $selectedDate, displayedComponents: .date)
-                        .datePickerStyle(GraphicalDatePickerStyle())
-                        .colorScheme(.dark)
-                        .accentColor(.cyan)
-                        .padding(20)
-                }
-                .padding(.horizontal, 20)
-
-                Spacer()
-
-                Button(action: {
-                    let components = Calendar.current.dateComponents([.year, .month, .day], from: selectedDate)
-                    contactsVM.assignBirthday(contactID: contactID, components: components)
-                    dismiss()
-                }) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.title3)
-                        Text("Save Birthday")
-                            .font(.headline)
+                        Text("Select a date for \(contactName)")
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.7))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 20)
                     }
-                    .foregroundColor(.white)
+                    .padding(.top, 24)
+
+                    GlassCard(intensity: .strong) {
+                        DatePicker("", selection: $selectedDate, displayedComponents: .date)
+                            .datePickerStyle(.graphical)
+                            .labelsHidden()
+                            .colorScheme(.dark)
+                            .tint(.cyan)
+                            .preferredColorScheme(.dark)
+                            .frame(maxWidth: .infinity)
+                            .clipped()
+                            .padding(8)
+                    }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
-                    .background(Color.green)
-                    .cornerRadius(16)
-                    .shadow(color: Color.black.opacity(0.3), radius: 15, x: 0, y: 8)
+                    .padding(.horizontal, 16)
+
+                    Spacer(minLength: 0)
+
+                    Button(action: saveBirthday) {
+                        HStack(spacing: 12) {
+                            if isSaving {
+                                ProgressView()
+                                    .tint(.white)
+                            } else {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.title3)
+                            }
+                            Text(isSaving ? "Saving…" : "Save Birthday")
+                                .font(.headline)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
+                        .background(Color.green.opacity(isSaving ? 0.7 : 1))
+                        .cornerRadius(16)
+                        .shadow(color: Color.black.opacity(0.3), radius: 15, x: 0, y: 8)
+                    }
+                    .disabled(isSaving)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 24)
                 }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 40)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundStyle(.white)
+                        .disabled(isSaving)
+                }
+            }
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .alert(
+                "Couldn't Save Birthday",
+                isPresented: Binding(
+                    get: { saveErrorMessage != nil },
+                    set: { if !$0 { saveErrorMessage = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) { saveErrorMessage = nil }
+            } message: {
+                Text(saveErrorMessage ?? "")
+            }
+        }
+        .preferredColorScheme(.dark)
+        .interactiveDismissDisabled(isSaving)
+    }
+
+    private func saveBirthday() {
+        guard !isSaving else { return }
+        isSaving = true
+        saveErrorMessage = nil
+        let components = Calendar.current.dateComponents([.year, .month, .day], from: selectedDate)
+        contactsVM.assignBirthday(contactID: contactID, components: components) { result in
+            isSaving = false
+            switch result {
+            case .success:
+                onSaveSucceeded()
+                dismiss()
+            case .failure(let error):
+                saveErrorMessage = error.localizedDescription
             }
         }
     }
@@ -1022,7 +1224,7 @@ struct addMissingCalendar: View {
 @available(iOS 17.0, *)
 struct BrowseBirthdaysView: View {
     @State private var selectedMonth = "January"
-    @State private var selectedTab: ViewMode = .byMonth
+    @State private var selectedTab: ViewMode = .calendar
     @State private var selectedDate = Date()
     var contactsVM: ContactViewModel
 
@@ -1043,40 +1245,21 @@ struct BrowseBirthdaysView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     VStack(alignment: .leading, spacing: 8) {
                         Label("Browse Birthdays", systemImage: "calendar")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
+                            .font(.title.bold())
                             .foregroundStyle(.white)
                             .labelStyle(.titleAndIcon)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                         Text("View by month or calendar")
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.7))
                     }
-                    .padding(.horizontal, 24)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
                     .padding(.top, 20)
 
                     // Simple tab selector
                     HStack(spacing: 12) {
-                        Button(action: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                selectedTab = .byMonth
-                            }
-                        }) {
-                            Label("By Month", systemImage: "list.bullet")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .fill(selectedTab == .byMonth ? Color.blue : Color(red: 0.12, green: 0.16, blue: 0.35).opacity(0.5))
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 16)
-                                                .stroke(Color.white.opacity(selectedTab == .byMonth ? 0.3 : 0.15), lineWidth: 1)
-                                        )
-                                )
-                        }
-                        
                         Button(action: {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                 selectedTab = .calendar
@@ -1097,8 +1280,29 @@ struct BrowseBirthdaysView: View {
                                         )
                                 )
                         }
+
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                selectedTab = .byMonth
+                            }
+                        }) {
+                            Label("By Month", systemImage: "list.bullet")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(selectedTab == .byMonth ? Color.blue : Color(red: 0.12, green: 0.16, blue: 0.35).opacity(0.5))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .stroke(Color.white.opacity(selectedTab == .byMonth ? 0.3 : 0.15), lineWidth: 1)
+                                        )
+                                )
+                        }
                     }
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, 20)
 
                     if selectedTab == .byMonth {
                         ByMonthView(selectedMonth: $selectedMonth, months: months, contactsVM: contactsVM)
@@ -1106,7 +1310,8 @@ struct BrowseBirthdaysView: View {
                         CalendarView(selectedDate: $selectedDate, contactsVM: contactsVM)
                     }
                 }
-                .padding(.bottom, 24)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, 32)
             }
         }
     }
@@ -1187,7 +1392,7 @@ struct ByMonthView: View {
                 
                 Spacer()
                 
-                if settings.showAgeTurning, let age = contact.ageTurning {
+                if settings.showAgeTurning, contact.hasKnownBirthYear, let age = contact.ageTurning {
                     Text("Turning \(age)")
                         .foregroundColor(.white.opacity(0.65))
                         .font(.subheadline)
@@ -1218,16 +1423,20 @@ struct CalendarView: View {
                     selectedDate: $selectedDate,
                     contactsVM: contactsVM
                 )
-                .frame(minHeight: 340)
-                .padding(12)
+                .frame(maxWidth: .infinity)
+                .frame(height: 360)
+                .clipped()
+                .padding(8)
             }
-            .padding(.horizontal, 24)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 16)
 
             VStack(alignment: .leading, spacing: 12) {
                 Text("Selected: \(selectedDate.formattedDate())")
                     .foregroundColor(.white.opacity(0.7))
                     .font(.subheadline)
-                    .padding(.horizontal, 24)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
 
                 LazyVStack(spacing: 12) {
                     ForEach(contactsVM.contactsPerDate(date: selectedDate)) { contact in
@@ -1248,10 +1457,12 @@ struct CalendarView: View {
                         .frame(maxWidth: .infinity)
                         .padding(24)
                     }
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, 16)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(maxWidth: .infinity)
     }
 
     func calendarCard(contact: Contact) -> some View {
@@ -1285,7 +1496,7 @@ struct CalendarView: View {
                         .font(.headline)
                         .fontWeight(.semibold)
                     
-                    if settings.showAgeTurning, let age = contact.ageTurning {
+                    if settings.showAgeTurning, contact.hasKnownBirthYear, let age = contact.ageTurning {
                         Text("Turning \(age)")
                             .foregroundColor(.white.opacity(0.65))
                             .font(.caption)
