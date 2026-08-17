@@ -5,23 +5,39 @@ import UserNotifications
 /// - people whose birthday is **today** (always, when notifications are on)
 /// - people whose birthday is in **X days**, when an initial ping is enabled
 ///
-/// This is the live scheduler (called after contact load). `NotificationsManager.refreshBirthdayNotifications`
-/// is unused and must stay unused so we do not create a second annual stack.
-final class BirthdayNotificationManager {
+/// Live path: day-of + initial ping via `refreshDailySchedule` after contact load.
+final class BirthdayNotificationManager: NSObject, UNUserNotificationCenterDelegate {
     static let shared = BirthdayNotificationManager()
 
-    private init() {}
+    private override init() {
+        super.init()
+    }
 
-    private let lastScheduledKey = "BirthdayPal.lastScheduledYMD"
     private let idPrefix = "bday-" // used to find/remove only our notifications
 
     // MARK: Public API
+
+    /// Call once at app start (sets foreground-banner delegate + requests permission).
+    func setUp() {
+        let center = UNUserNotificationCenter.current()
+        center.delegate = self
+        requestAuthorizationIfNeeded()
+    }
 
     func requestAuthorizationIfNeeded() {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             guard settings.authorizationStatus == .notDetermined else { return }
             UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
         }
+    }
+
+    // Show banner even when app is foregrounded
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .sound, .list])
     }
 
     /// Idempotent daily refresh using `AppSettings` fire time and initial-ping days.
@@ -43,7 +59,6 @@ final class BirthdayNotificationManager {
         fireMinute: Int,
         initialPingDays: Int
     ) {
-        let todayYMD = Self.ymdString(Date())
         let dayOfContacts = contacts.filter { $0.daysToBirthday == 0 }
         let pingDays = AppSettings.clampedInitialPingDays(initialPingDays)
         let comingUpContacts: [Contact]
@@ -63,7 +78,6 @@ final class BirthdayNotificationManager {
             UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ours)
 
             guard !dayOfContacts.isEmpty || !comingUpContacts.isEmpty else {
-                UserDefaults.standard.set(todayYMD, forKey: self.lastScheduledKey)
                 return
             }
 
@@ -106,8 +120,6 @@ final class BirthdayNotificationManager {
             for contact in comingUpContacts {
                 addRequest(contact: contact, kind: .comingUp)
             }
-
-            UserDefaults.standard.set(todayYMD, forKey: self.lastScheduledKey)
         }
     }
 
@@ -116,22 +128,6 @@ final class BirthdayNotificationManager {
         UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
             let ours = requests.map(\.identifier).filter { $0.hasPrefix(self.idPrefix) }
             UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ours)
-        }
-        UserDefaults.standard.removeObject(forKey: lastScheduledKey)
-    }
-
-    /// Clears the "already scheduled today" marker so the next refresh re-creates triggers (e.g. after time change).
-    func invalidateDailyScheduleMarker() {
-        UserDefaults.standard.removeObject(forKey: lastScheduledKey)
-    }
-
-    /// Debug print
-    func debugPrintPending() {
-        UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
-            print("🔔 Pending (\(requests.count)):")
-            for r in requests {
-                print(" - \(r.identifier)")
-            }
         }
     }
 
@@ -166,15 +162,6 @@ final class BirthdayNotificationManager {
                 return "\(name)'s birthday is in \(daysUntil) days"
             }
         }
-    }
-
-    private static func ymdString(_ date: Date) -> String {
-        let df = DateFormatter()
-        df.calendar = Calendar(identifier: .gregorian)
-        df.locale = Locale(identifier: "en_US_POSIX")
-        df.timeZone = .current
-        df.dateFormat = "yyyy-MM-dd"
-        return df.string(from: date)
     }
 
     /// Stable ID per contact per day per kind: "bday-today-<name>-MMDD-YYYY"

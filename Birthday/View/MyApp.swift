@@ -11,8 +11,8 @@ import SwiftUI
 @main
 struct MyApp: App {
     init() {
-            NotificationsManager.shared.setUp()
-        }
+        BirthdayNotificationManager.shared.setUp()
+    }
     var body: some Scene {
         WindowGroup {
             ContentView()

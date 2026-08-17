@@ -51,7 +51,7 @@ struct MessageTemplatePickerView: View {
         }
         .task { await updateLLMReadyFlag() }
         .sheet(isPresented: $showShareSheet) {
-            MessageShareSheet(items: [editableMessage])
+            ShareSheet(items: [editableMessage])
         }
         .alert(
             "Heads up",
@@ -99,21 +99,13 @@ struct MessageTemplatePickerView: View {
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.7))
 
-                        if #available(iOS 17.0, *) {
-                            TextField("e.g. mention our trip, keep it short",
-                                      text: $userHint,
-                                      axis: .vertical)
-                                .lineLimit(1...3)
-                                .padding(12)
-                                .background(glassFieldBackground)
-                                .foregroundColor(.white)
-                        } else {
-                            TextField("e.g. mention our trip, keep it short",
-                                      text: $userHint)
-                                .padding(12)
-                                .background(glassFieldBackground)
-                                .foregroundColor(.white)
-                        }
+                        TextField("e.g. mention our trip, keep it short",
+                                  text: $userHint,
+                                  axis: .vertical)
+                            .lineLimit(1...3)
+                            .padding(12)
+                            .background(glassFieldBackground)
+                            .foregroundColor(.white)
                     }
                     .padding(.horizontal, 20)
 
@@ -611,14 +603,4 @@ struct MessageTemplatePickerView: View {
         let age = Calendar.current.dateComponents([.year], from: dob, to: Date()).year
         return (age ?? 0) > 0 ? age : nil
     }
-}
-
-private struct MessageShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
-    }
-
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

@@ -8,7 +8,6 @@ import UIKit
 
 /// UICalendarView wrapper that draws dots on days with birthdays.
 /// Hosted in a container so intrinsic size cannot blow past screen width inside ScrollView.
-@available(iOS 17.0, *)
 struct BirthdayCalendarRepresentable: UIViewRepresentable {
     @Binding var selectedDate: Date
     var contactsVM: ContactViewModel

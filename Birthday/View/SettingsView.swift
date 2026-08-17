@@ -7,7 +7,6 @@ import SwiftUI
 import UIKit
 import UserNotifications
 
-@available(iOS 17.0, *)
 struct SettingsView: View {
     @ObservedObject var contactsVM: ContactViewModel
     @ObservedObject private var settings = AppSettings.shared
@@ -451,7 +450,6 @@ struct SettingsView: View {
 
     private func rescheduleNotifications() {
         guard settings.notificationsEnabled else { return }
-        BirthdayNotificationManager.shared.invalidateDailyScheduleMarker()
         BirthdayNotificationManager.shared.refreshDailySchedule(
             contacts: contactsVM.contactsWithBirthday
         )
@@ -483,16 +481,4 @@ struct SettingsView: View {
             openURL(url)
         }
     }
-}
-
-// MARK: - Share sheet
-
-private struct ShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
-    }
-
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

@@ -55,12 +55,10 @@
 		21EB9D3E2EC4865D00D7172A /* Exceptions for "BirthdayPalWidget.swift" folder in "Birthday" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				AppIntent.swift,
 				Assets.xcassets,
 				BirthdayPalWidget_swift.swift,
 				BirthdayPalWidget_swiftBundle.swift,
 				BirthdayPalWidget_swiftControl.swift,
-				BirthdayPalWidget_swiftLiveActivity.swift,
 				Info.plist,
 			);
 			target = 32B301D62EB2DE5F0069DA79 /* Birthday */;
@@ -68,12 +66,10 @@
 		21EB9D3F2EC4865D00D7172A /* Exceptions for "BirthdayPalWidget.swift" folder in "BirthdayPalWidget.swiftExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				AppIntent.swift,
 				Assets.xcassets,
 				BirthdayPalWidget_swift.swift,
 				BirthdayPalWidget_swiftBundle.swift,
 				BirthdayPalWidget_swiftControl.swift,
-				BirthdayPalWidget_swiftLiveActivity.swift,
 			);
 			target = 21EB9CFB2EC4735700D7172A /* BirthdayPalWidget.swiftExtension */;
 		};

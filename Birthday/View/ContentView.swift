@@ -4,15 +4,10 @@ import MessageUI
 
 struct ContentView: View {
     var body: some View {
-        if #available(iOS 17.0, *) {
-            LandingPage()
-        } else {
-            Text("Requires iOS 17 or later")
-        }
+        LandingPage()
     }
 }
 
-@available(iOS 17.0, *)
 struct LandingPage: View {
     @StateObject private var contactsVM = ContactViewModel()
     @State private var path = NavigationPath()
@@ -238,7 +233,6 @@ struct LandingPage: View {
         .environmentObject(AppSettings.shared)
         .task {
             contactsVM.loadContacts()
-            BirthdayNotificationManager.shared.requestAuthorizationIfNeeded()
             applyPendingDeepLinkIfNeeded()
         }
         .onOpenURL { url in
@@ -298,7 +292,6 @@ struct LandingPage: View {
 
 // MARK: - Today's Birthdays
 
-@available(iOS 17.0, *)
 struct TodaysBirthdaysView: View {
     @ObservedObject var contactsVM: ContactViewModel
     var onSelectContact: (String) -> Void
@@ -421,7 +414,6 @@ struct GlassCard<Content: View>: View {
 
 // MARK: - Coming Up Carousel
 
-@available(iOS 17.0, *)
 private struct ComingUpCarousel: View {
     let contacts: [Contact]
     @Binding var scrollID: String?
@@ -731,7 +723,7 @@ struct BdayCard: View {
 }
 
 // MARK: - Edit View
-@available(iOS 17.0, *)
+
 struct EditView: View {
     var contact: Contact
     var contactsVM: ContactViewModel
@@ -811,12 +803,7 @@ struct EditView: View {
             }
         }
         .sheet(isPresented: $messageVM.showTemplatePicker) {
-            if #available(iOS 18.0, *) {
-                MessageTemplatePickerView(messageVM: messageVM)
-            } else {
-                Text("Template picker requires iOS 18 or later")
-                    .foregroundColor(.white)
-            }
+            MessageTemplatePickerView(messageVM: messageVM)
         }
         .fullScreenCover(isPresented: $messageVM.showComposer) {
             if MFMessageComposeViewController.canSendText() {
@@ -1220,7 +1207,6 @@ struct addMissingCalendar: View {
 
 // MARK: - Browse + Calendar
 
-@available(iOS 17.0, *)
 struct BrowseBirthdaysView: View {
     @State private var selectedMonth = "January"
     @State private var selectedTab: ViewMode = .calendar
@@ -1316,7 +1302,6 @@ struct BrowseBirthdaysView: View {
     }
 }
 
-@available(iOS 17.0, *)
 struct ByMonthView: View {
     @Binding var selectedMonth: String
     let months: [String]
@@ -1411,7 +1396,6 @@ struct ByMonthView: View {
     }
 }
 
-@available(iOS 17.0, *)
 struct CalendarView: View {
     @Binding var selectedDate: Date
     var contactsVM: ContactViewModel
