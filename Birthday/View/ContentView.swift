@@ -149,6 +149,7 @@ struct TodayTabView: View {
     @ObservedObject var contactsVM: ContactViewModel
     var onSelectContact: (String) -> Void
     @State private var scrollID: String?
+    @State private var viewingContactID: ContactSheetTarget?
 
     private let cardWidth: CGFloat = CompactBdayCard.width
     private let cardSpacing: CGFloat = 16
@@ -185,6 +186,11 @@ struct TodayTabView: View {
             }
         }
         .largeNavigationTitle("Today")
+        .sheet(item: $viewingContactID) { target in
+            ContactSheetView(contactID: target.id, allowsEditing: false) {
+                viewingContactID = nil
+            }
+        }
         .onAppear { syncScrollID() }
         .onChange(of: upcomingBirthdays.map(\.id)) { _, _ in
             syncScrollID()
@@ -255,7 +261,8 @@ struct TodayTabView: View {
             cardWidth: cardWidth,
             spacing: cardSpacing,
             containerWidth: containerWidth,
-            onSelectContact: onSelectContact
+            onSelectContact: onSelectContact,
+            onOpenContact: { viewingContactID = ContactSheetTarget(id: $0) }
         )
         .padding(.top, 8)
     }
@@ -282,6 +289,7 @@ private struct TodayBirthdayCarousel: View {
     let spacing: CGFloat
     let containerWidth: CGFloat
     let onSelectContact: (String) -> Void
+    let onOpenContact: (String) -> Void
 
     private var sideInset: CGFloat {
         max((containerWidth - cardWidth) / 2, 24)
@@ -295,7 +303,8 @@ private struct TodayBirthdayCarousel: View {
                     CompactBdayCard(
                         contact: contact,
                         showsSendMessage: isToday,
-                        onSendMessage: isToday ? { onSelectContact(contact.id) } : nil
+                        onSendMessage: isToday ? { onSelectContact(contact.id) } : nil,
+                        onOpenContact: { onOpenContact(contact.id) }
                     )
                     .frame(width: cardWidth, height: CompactBdayCard.height(showsSendMessage: isToday))
                     .id(contact.id)
@@ -328,7 +337,9 @@ struct CompactBdayCard: View {
     var contact: Contact
     var showsSendMessage: Bool = false
     var onSendMessage: (() -> Void)? = nil
+    var onOpenContact: (() -> Void)? = nil
     @EnvironmentObject private var settings: AppSettings
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         VStack(spacing: 14) {
@@ -391,7 +402,14 @@ struct CompactBdayCard: View {
                 }
 
                 if showsSendMessage, contact.daysToBirthday == 0, let onSendMessage {
-                    Button(action: onSendMessage) {
+                    Button {
+                        // AI off: straight to Messages for this contact, nothing prefilled.
+                        if !settings.aiAssistanceEnabled,
+                           openMessagesApp(for: contact.phoneNumber, using: openURL) {
+                            return
+                        }
+                        onSendMessage()
+                    } label: {
                         Label("Send Message", systemImage: "message.fill")
                             .font(.caption.weight(.semibold))
                             .frame(maxWidth: .infinity)
@@ -406,6 +424,8 @@ struct CompactBdayCard: View {
         .padding(20)
         .frame(width: Self.width, height: Self.height(showsSendMessage: showsSendMessage))
         .liquidGlassCard(cornerRadius: LiquidGlass.cardCornerRadius, interactive: true)
+        .contentShape(Rectangle())
+        .onTapGesture { onOpenContact?() }
     }
 }
 
@@ -418,16 +438,6 @@ struct AchievementCardView: View {
         LiquidGlassCard(padding: 24) {
             HStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 16) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "sparkles")
-                            .foregroundStyle(AppTheme.celebration)
-                            .font(.title2)
-                        Text("This Month")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(AppTheme.text.opacity(0.9))
-                    }
-
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(alignment: .lastTextBaseline, spacing: 8) {
                             Text("\(rememberedCount)")
@@ -469,6 +479,7 @@ struct EditView: View {
 
     @StateObject private var messageVM = BirthdayMessageViewModel()
     @Environment(\.dismiss) var dismiss
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         ZStack {
@@ -512,6 +523,11 @@ struct EditView: View {
                 Spacer()
 
                 Button(action: {
+                    // AI off: straight to Messages for this contact, nothing prefilled.
+                    if !settings.aiAssistanceEnabled,
+                       openMessagesApp(for: contact.phoneNumber, using: openURL) {
+                        return
+                    }
                     let cnContact = convertToCNContact(contact)
                     messageVM.startBirthdayFlow(with: [cnContact], thumbnailData: [contact.thumbnailData])
                 }) {
@@ -1200,6 +1216,29 @@ struct CalendarView: View {
             }
         }
     }
+}
+
+// MARK: - Messages hand-off
+
+/// Opens Messages for `phoneNumber` with an empty draft. Returns false when there is
+/// no usable number, so callers can fall back to the in-app flow.
+///
+/// The hand-off leaves the app, so there is no send result to observe — a successful
+/// hand-off counts toward the remembered-birthdays total.
+@discardableResult
+private func openMessagesApp(for phoneNumber: String?, using openURL: OpenURLAction) -> Bool {
+    guard let raw = phoneNumber else { return false }
+    var digits = raw.filter(\.isNumber)
+    guard !digits.isEmpty else { return false }
+    if raw.trimmingCharacters(in: .whitespaces).hasPrefix("+") {
+        digits = "+" + digits
+    }
+    guard let url = URL(string: "sms:\(digits)") else { return false }
+    openURL(url) { accepted in
+        guard accepted else { return }
+        NotificationCenter.default.post(name: .birthdayMessageSent, object: nil)
+    }
+    return true
 }
 
 // MARK: - View helpers

@@ -2,6 +2,7 @@
 
 import Foundation
 import FoundationModels
+import Network
 
 enum BirthdayLLMSource: Equatable {
     case appleFoundationModel
@@ -54,6 +55,10 @@ struct BirthdayLLMService {
     ) async -> BirthdayLLMOutcome {
         let age = Self.normalizedAge(from: ageOrYear)
         let fallback = MessageTemplates.make(tone: tone, name: name, age: age)
+
+        guard AppSettings.shared.aiAssistanceEnabled else {
+            return BirthdayLLMOutcome(text: fallback, notice: nil, source: .templates)
+        }
 
         if #available(iOS 26.0, *) {
             if Self.isAppleIntelligenceAvailable {
@@ -226,6 +231,15 @@ struct BirthdayLLMService {
     ) async -> BirthdayLLMOutcome {
         guard let url = OpenRouterConfig.functionURL else {
             return BirthdayLLMOutcome(text: fallback, notice: nil, source: .templates)
+        }
+
+        // Gemma needs the network; offline goes straight to the built-in templates.
+        guard await NetworkStatus.isOnline() else {
+            return BirthdayLLMOutcome(
+                text: fallback,
+                notice: "You’re offline, so we used a birthday template instead.",
+                source: .templates
+            )
         }
 
         let sanitizedHint = Self.sanitizeHint(userHint)
@@ -488,16 +502,6 @@ struct BirthdayLLMService {
         }
     }
 
-    @available(iOS 26.0, *)
-    private func outcome(
-        for error: LanguageModelSession.GenerationError,
-        fallback: String,
-        hintWasDropped: Bool
-    ) -> BirthdayLLMOutcome {
-        let notice = Self.notice(for: error, hintWasDropped: hintWasDropped)
-        return BirthdayLLMOutcome(text: fallback, notice: notice, source: .templates)
-    }
-
     private static func modelInstructions(tone: MessageTone?) -> String {
         let sharedRules = """
         You are a birthday text-message writer inside the BirthdayPal app.
@@ -530,6 +534,39 @@ struct BirthdayLLMService {
         Style:
         - Use the requested tone: formal, casual, funny, or romantic (keep romantic PG and appropriate).
         """
+    }
+}
+
+// MARK: - Reachability
+
+/// One-shot connectivity probe used before reaching for the remote Gemma model.
+enum NetworkStatus {
+    static func isOnline() async -> Bool {
+        let monitor = NWPathMonitor()
+        return await withCheckedContinuation { continuation in
+            let guardBox = ResumeOnce()
+            monitor.pathUpdateHandler = { path in
+                guard guardBox.claim() else { return }
+                monitor.cancel()
+                continuation.resume(returning: path.status == .satisfied)
+            }
+            monitor.start(queue: DispatchQueue(label: "BirthdayPal.NetworkStatus"))
+        }
+    }
+}
+
+/// NWPathMonitor can call its handler more than once; the continuation may resume only once.
+/// The handler runs off the main actor, so the guard has to be nonisolated.
+private final class ResumeOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    nonisolated(unsafe) private var claimed = false
+
+    nonisolated func claim() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        if claimed { return false }
+        claimed = true
+        return true
     }
 }
 

@@ -131,7 +131,6 @@ struct LiquidGlassBackButton: View {
             Image(systemName: "chevron.left")
                 .font(.body.weight(.semibold))
         }
-        .secondaryGlassButton()
         .accessibilityLabel("Back")
     }
 }
