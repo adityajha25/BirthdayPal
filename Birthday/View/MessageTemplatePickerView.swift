@@ -198,14 +198,14 @@ struct MessageTemplatePickerView: View {
                 HStack(spacing: 8) {
                     Image(systemName: tone.systemImage)
                         .font(.title3)
-                        .foregroundStyle(AppTheme.accent)
+                        .foregroundStyle(isSelected ? Color.white : AppTheme.accent)
                     Spacer()
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(isSelected ? AppTheme.accent : AppTheme.text.opacity(0.35))
+                        .foregroundColor(isSelected ? Color.white : AppTheme.text.opacity(0.35))
                 }
                 Text(tone.displayName)
                     .font(.headline)
-                    .foregroundColor(AppTheme.text)
+                    .foregroundColor(isSelected ? Color.white : AppTheme.text)
             }
             .padding(16)
             .frame(maxWidth: .infinity, minHeight: 88, alignment: .topLeading)
