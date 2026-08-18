@@ -436,23 +436,18 @@ struct MessageTemplatePickerView: View {
 
     /// True when on-device Apple Intelligence or the OpenRouter edge function can generate.
     private func updateLLMReadyFlag() async {
-        if OpenRouterConfig.isConfigured {
-            llmReady = true
-            return
-        }
+        // Order matches generation: Apple Foundation Models → Gemma (needs network) → templates.
         if #available(iOS 26.0, *) {
-            let model = SystemLanguageModel.default
-            switch model.availability {
-            case .available:
+            if case .available = SystemLanguageModel.default.availability {
                 llmReady = true
-            case .unavailable:
-                llmReady = false
-            @unknown default:
-                llmReady = false
+                return
             }
-        } else {
-            llmReady = false
         }
+        var canUseGemma = false
+        if OpenRouterConfig.isConfigured {
+            canUseGemma = await NetworkStatus.isOnline()
+        }
+        await MainActor.run { llmReady = canUseGemma }
     }
 
     // MARK: - Helpers for the view

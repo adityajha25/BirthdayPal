@@ -24,6 +24,7 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     notificationsSection
+                    messagesSection
                     displaySection
                     supportSection
                     aboutSection
@@ -84,14 +85,14 @@ struct SettingsView: View {
     private var notificationsSection: some View {
         settingsSection(title: "Notifications") {
             Toggle(isOn: $settings.notificationsEnabled) {
-                settingsLabel(icon: "bell.fill", title: "Birthday reminders")
+                settingsLabel(icon: "bell.fill", title: "Birthday Reminders")
             }
             .tint(AppTheme.accent)
 
             Divider().overlay(AppTheme.text.opacity(0.12))
 
             DatePicker(
-                "Reminder time",
+                "Reminder Time",
                 selection: Binding(
                     get: { settings.notificationTime },
                     set: { settings.notificationTime = $0 }
@@ -106,7 +107,7 @@ struct SettingsView: View {
             Divider().overlay(AppTheme.text.opacity(0.12))
 
             VStack(alignment: .leading, spacing: 12) {
-                settingsLabel(icon: "bell.badge", title: "Initial ping")
+                settingsLabel(icon: "bell.badge", title: "Initial Ping")
 
                 HStack(spacing: 10) {
                     TextField(
@@ -125,7 +126,7 @@ struct SettingsView: View {
                     .padding(.vertical, 8)
                     .frame(minWidth: 52, maxWidth: 64)
                     .liquidGlassCard(cornerRadius: 10)
-                    .accessibilityLabel("Days before birthday")
+                    .accessibilityLabel("Days Before Birthday")
 
                     Text(settings.initialPingDays == 1 ? "day before" : "days before")
                         .font(.subheadline)
@@ -142,7 +143,7 @@ struct SettingsView: View {
                     .labelsHidden()
                     .tint(AppTheme.accent)
                     .fixedSize()
-                    .accessibilityLabel("Initial ping days")
+                    .accessibilityLabel("Initial Ping Days")
                 }
             }
             .disabled(!settings.notificationsEnabled)
@@ -150,16 +151,28 @@ struct SettingsView: View {
 
             Divider().overlay(AppTheme.text.opacity(0.12))
 
-            settingsActionButton(icon: "gear", title: "System notification settings") {
+            settingsActionButton(icon: "gear", title: "System Notification Settings") {
                 openSystemSettings()
             }
+        }
+    }
+
+    private var messagesSection: some View {
+        settingsSection(title: "Messages") {
+            Toggle(isOn: $settings.aiAssistanceEnabled) {
+                settingsLabel(
+                    icon: "sparkles",
+                    title: "AI Assistance",
+                )
+            }
+            .tint(AppTheme.accent)
         }
     }
 
     private var displaySection: some View {
         settingsSection(title: "Display") {
             Toggle(isOn: $settings.showAgeTurning) {
-                settingsLabel(icon: "cake", title: "Show age turning")
+                settingsLabel(icon: "cake", title: "Show Age Turning")
             }
             .tint(AppTheme.accent)
 
@@ -177,7 +190,7 @@ struct SettingsView: View {
             HStack(spacing: 12) {
                 settingsLabel(
                     icon: "arrow.clockwise",
-                    title: "Refresh contacts",
+                    title: "Refresh Contacts",
                     subtitle: showRefreshConfirmation ? "Updated just now" : nil
                 )
 
@@ -223,7 +236,7 @@ struct SettingsView: View {
 
             Divider().overlay(AppTheme.text.opacity(0.12))
 
-            settingsActionButton(icon: "square.and.arrow.up", title: "Send to a friend") {
+            settingsActionButton(icon: "square.and.arrow.up", title: "Send to a Friend") {
                 showShareSheet = true
             }
 
@@ -231,7 +244,7 @@ struct SettingsView: View {
 
             settingsActionButton(
                 icon: "envelope.fill",
-                title: "Contact us",
+                title: "Contact Us",
                 subtitle: AppSettings.supportEmail
             ) {
                 openMail(

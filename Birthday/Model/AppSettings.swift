@@ -16,6 +16,7 @@ final class AppSettings: ObservableObject {
         static let notificationsEnabled = "BirthdayPal.notificationsEnabled"
         static let showAgeTurning = "BirthdayPal.showAgeTurning"
         static let initialPingDays = "BirthdayPal.initialPingDays"
+        static let aiAssistanceEnabled = "BirthdayPal.aiAssistanceEnabled"
     }
 
     /// Extra reminder N days before the birthday. `0` (or empty in Settings) means Off.
@@ -52,6 +53,11 @@ final class AppSettings: ObservableObject {
 
     @Published var showAgeTurning: Bool {
         didSet { UserDefaults.standard.set(showAgeTurning, forKey: Keys.showAgeTurning) }
+    }
+
+    /// When off, Send Message skips generation and opens Messages for the contact.
+    @Published var aiAssistanceEnabled: Bool {
+        didSet { UserDefaults.standard.set(aiAssistanceEnabled, forKey: Keys.aiAssistanceEnabled) }
     }
 
     /// Extra reminder N days before the birthday. `0` disables the initial ping (day-of still fires).
@@ -108,6 +114,11 @@ final class AppSettings: ObservableObject {
             showAgeTurning = true
         } else {
             showAgeTurning = defaults.bool(forKey: Keys.showAgeTurning)
+        }
+        if defaults.object(forKey: Keys.aiAssistanceEnabled) == nil {
+            aiAssistanceEnabled = true
+        } else {
+            aiAssistanceEnabled = defaults.bool(forKey: Keys.aiAssistanceEnabled)
         }
         if defaults.object(forKey: Keys.initialPingDays) == nil {
             initialPingDays = 0
