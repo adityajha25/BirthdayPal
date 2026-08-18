@@ -22,7 +22,6 @@ final class ContactViewModel: ObservableObject {
 
     /// Upcoming birthdays for the home carousel, sorted by next observance.
     @Published private(set) var upcomingPreview: [Contact] = []
-    @Published private(set) var todaysBirthdays: [Contact] = []
     @Published private(set) var birthdaysThisMonth: [Contact] = []
     @Published private(set) var birthdaysThisMonthCount: Int = 0
 
@@ -220,7 +219,6 @@ final class ContactViewModel: ObservableObject {
     private func rebuildDerivedCaches() {
         let list = contactsWithBirthday
         upcomingPreview = list
-        todaysBirthdays = list.filter { $0.daysToBirthday == 0 }
 
         let calendar = Calendar.current
         let now = Date()

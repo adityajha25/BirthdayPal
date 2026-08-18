@@ -3,7 +3,6 @@
 import SwiftUI
 import UIKit
 import Contacts
-import FoundationModels   // used only to detect LLM availability
 
 struct MessageTemplatePickerView: View {
     @ObservedObject var messageVM: BirthdayMessageViewModel
@@ -13,7 +12,6 @@ struct MessageTemplatePickerView: View {
     @State private var editableMessage: String = ""
     @State private var showEditor: Bool = false
     @State private var userHint: String = ""
-    @State private var llmReady: Bool = false
 
     @State private var lastTone: MessageTone?
     @State private var lastName: String = ""
@@ -50,7 +48,6 @@ struct MessageTemplatePickerView: View {
             }
             .toolbar(showEditor ? .visible : .hidden, for: .navigationBar)
         }
-        .task { await updateLLMReadyFlag() }
         .sheet(isPresented: $showShareSheet) {
             ShareSheet(items: [editableMessage])
         }
@@ -66,6 +63,7 @@ struct MessageTemplatePickerView: View {
             }
         } message: {
             Text(messageVM.generationNotice ?? "")
+                .multilineTextAlignment(.center)
         }
         .onDisappear {
             copyResetTask?.cancel()
@@ -155,14 +153,6 @@ struct MessageTemplatePickerView: View {
                             }
                             .primaryGlassButton()
                             .tint(.blue)
-
-                            if !llmReady {
-                                Text(messagePreview(for: selectedTone, contact: contact))
-                                    .font(.caption)
-                                    .foregroundColor(AppTheme.text.opacity(0.5))
-                                    .multilineTextAlignment(.center)
-                                    .padding(.horizontal, 8)
-                            }
                         }
 
                         Button {
@@ -432,24 +422,6 @@ struct MessageTemplatePickerView: View {
         }
     }
 
-    // MARK: - LLM availability check
-
-    /// True when on-device Apple Intelligence or the OpenRouter edge function can generate.
-    private func updateLLMReadyFlag() async {
-        // Order matches generation: Apple Foundation Models → Gemma (needs network) → templates.
-        if #available(iOS 26.0, *) {
-            if case .available = SystemLanguageModel.default.availability {
-                llmReady = true
-                return
-            }
-        }
-        var canUseGemma = false
-        if OpenRouterConfig.isConfigured {
-            canUseGemma = await NetworkStatus.isOnline()
-        }
-        await MainActor.run { llmReady = canUseGemma }
-    }
-
     // MARK: - Helpers for the view
 
     private func sendEditedMessage() {
@@ -482,12 +454,6 @@ struct MessageTemplatePickerView: View {
         } else {
             return "there"
         }
-    }
-
-    private func messagePreview(for tone: MessageTone?, contact: CNContact) -> String {
-        let name = displayName(for: contact)
-        let age = calculateAge(from: contact.birthday)
-        return MessageTemplates.make(tone: tone, name: name, age: age)
     }
 
     private func calculateAge(from birthday: DateComponents?) -> Int? {

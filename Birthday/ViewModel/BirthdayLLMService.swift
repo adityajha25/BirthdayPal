@@ -502,16 +502,6 @@ struct BirthdayLLMService {
         }
     }
 
-    @available(iOS 26.0, *)
-    private func outcome(
-        for error: LanguageModelSession.GenerationError,
-        fallback: String,
-        hintWasDropped: Bool
-    ) -> BirthdayLLMOutcome {
-        let notice = Self.notice(for: error, hintWasDropped: hintWasDropped)
-        return BirthdayLLMOutcome(text: fallback, notice: notice, source: .templates)
-    }
-
     private static func modelInstructions(tone: MessageTone?) -> String {
         let sharedRules = """
         You are a birthday text-message writer inside the BirthdayPal app.
@@ -566,11 +556,12 @@ enum NetworkStatus {
 }
 
 /// NWPathMonitor can call its handler more than once; the continuation may resume only once.
-private final class ResumeOnce {
+/// The handler runs off the main actor, so the guard has to be nonisolated.
+private final class ResumeOnce: @unchecked Sendable {
     private let lock = NSLock()
-    private var claimed = false
+    nonisolated(unsafe) private var claimed = false
 
-    func claim() -> Bool {
+    nonisolated func claim() -> Bool {
         lock.lock()
         defer { lock.unlock() }
         if claimed { return false }
