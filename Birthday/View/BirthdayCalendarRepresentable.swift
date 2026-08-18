@@ -26,8 +26,7 @@ struct BirthdayCalendarRepresentable: UIViewRepresentable {
         calendarView.delegate = context.coordinator
         calendarView.calendar = Calendar.current
         calendarView.locale = .current
-        calendarView.tintColor = .systemCyan
-        calendarView.overrideUserInterfaceStyle = .dark
+        calendarView.tintColor = AppTheme.accentUIColor
         calendarView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         calendarView.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
@@ -90,7 +89,7 @@ struct BirthdayCalendarRepresentable: UIViewRepresentable {
             decorationFor dateComponents: DateComponents
         ) -> UICalendarView.Decoration? {
             guard parent.contactsVM.hasBirthday(on: dateComponents) else { return nil }
-            return .default(color: .systemCyan, size: .small)
+            return .default(color: AppTheme.accentUIColor, size: .small)
         }
 
         func dateSelection(

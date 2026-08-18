@@ -29,6 +29,8 @@ final class ContactViewModel: ObservableObject {
     /// True only while the first birthday fetch is in flight (Coming Up section).
     @Published var isLoadingBirthdays: Bool = true
     @Published var isLoadingMissing: Bool = false
+    /// True while a user-initiated refresh of both scopes is in flight (drives the Settings spinner).
+    @Published private(set) var isRefreshingContacts: Bool = false
     @Published var errorMessage: String?
 
     @Published var rememberedBirthdaysCount: Int = 0
@@ -71,10 +73,33 @@ final class ContactViewModel: ObservableObject {
 
     // MARK: - Loading
 
+    /// Refreshes both scopes and keeps `isRefreshingContacts` true until they finish.
+    func refreshAllContacts() {
+        guard !isRefreshingContacts else { return }
+        isRefreshingContacts = true
+
+        let group = DispatchGroup()
+        group.enter()
+        loadContacts(force: true) { group.leave() }
+        group.enter()
+        loadMissingBirthdayContactsIfNeeded(force: true) { group.leave() }
+
+        group.notify(queue: .main) { [weak self] in
+            self?.isRefreshingContacts = false
+        }
+    }
+
     /// Loads birthday contacts (fast path). Pass `force: true` to refresh from the address book.
-    func loadContacts(force: Bool = false) {
-        if isBirthdayFetchInFlight { return }
-        if hasCompletedInitialBirthdayLoad && !force { return }
+    /// `completion` always runs on the main queue, including on the early-return paths.
+    func loadContacts(force: Bool = false, completion: (() -> Void)? = nil) {
+        if isBirthdayFetchInFlight {
+            completion?()
+            return
+        }
+        if hasCompletedInitialBirthdayLoad && !force {
+            completion?()
+            return
+        }
 
         isBirthdayFetchInFlight = true
         // Keep showing existing cards during refresh; only spin on true first load.
@@ -84,6 +109,7 @@ final class ContactViewModel: ObservableObject {
         errorMessage = nil
 
         contactsManager.fetchContacts(scope: .withBirthdaysOnly) { [weak self] result in
+            defer { completion?() }
             guard let self else { return }
 
             switch result {
@@ -104,9 +130,16 @@ final class ContactViewModel: ObservableObject {
     }
 
     /// Loads contacts missing birthdays (add-missing). Call when that screen appears.
-    func loadMissingBirthdayContactsIfNeeded(force: Bool = false) {
-        if isMissingFetchInFlight { return }
-        if hasLoadedMissing && !force { return }
+    /// `completion` always runs on the main queue, including on the early-return paths.
+    func loadMissingBirthdayContactsIfNeeded(force: Bool = false, completion: (() -> Void)? = nil) {
+        if isMissingFetchInFlight {
+            completion?()
+            return
+        }
+        if hasLoadedMissing && !force {
+            completion?()
+            return
+        }
 
         isMissingFetchInFlight = true
         if contactsWithoutBirthday.isEmpty {
@@ -114,6 +147,7 @@ final class ContactViewModel: ObservableObject {
         }
 
         contactsManager.fetchContacts(scope: .missingBirthdaysOnly) { [weak self] result in
+            defer { completion?() }
             guard let self else { return }
             self.isMissingFetchInFlight = false
             self.isLoadingMissing = false

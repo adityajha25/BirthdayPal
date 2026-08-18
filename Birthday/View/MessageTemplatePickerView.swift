@@ -37,7 +37,7 @@ struct MessageTemplatePickerView: View {
     private var canUndo: Bool { messageHistory.count > 1 }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 AppTheme.background
                     .ignoresSafeArea()
@@ -48,7 +48,7 @@ struct MessageTemplatePickerView: View {
                     messageEditorScreen
                 }
             }
-            .navigationBarHidden(true)
+            .toolbar(showEditor ? .visible : .hidden, for: .navigationBar)
         }
         .task { await updateLLMReadyFlag() }
         .sheet(isPresented: $showShareSheet) {
@@ -79,41 +79,43 @@ struct MessageTemplatePickerView: View {
         ScrollView {
             VStack(spacing: 24) {
                 if let contact = currentContact {
+                    let name = displayName(for: contact)
                     VStack(spacing: 12) {
                         ContactPhotoView(
-                            name: displayName(for: contact),
+                            name: name,
                             thumbnailData: messageVM.thumbnailData(for: messageVM.currentIndex),
                             size: 80
                         )
+                        Text(name)
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundColor(AppTheme.text)
                         Text("Send Birthday Message")
                             .font(.title2)
                             .fontWeight(.bold)
-                            .foregroundColor(.white)
-                        Text("to \(displayName(for: contact))")
-                            .font(.headline)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(AppTheme.text)
                     }
                     .padding(.top, 40)
 
                     VStack(alignment: .leading, spacing: 8) {
                         Label("Add a note (optional)", systemImage: "pencil.line")
                             .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(AppTheme.text.opacity(0.7))
 
                         TextField("", text: $userHint)
                             .focused($isNoteFieldFocused)
                             .submitLabel(.done)
                             .onSubmit { isNoteFieldFocused = false }
                             .padding(12)
-                            .background(glassFieldBackground)
-                            .foregroundColor(.white)
+                            .liquidGlassCard(cornerRadius: LiquidGlass.fieldCornerRadius)
+                            .foregroundColor(AppTheme.text)
                     }
                     .padding(.horizontal, 20)
 
                     VStack(alignment: .leading, spacing: 12) {
                         Label("Message style (optional)", systemImage: "paintbrush.pointed.fill")
                             .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(AppTheme.text.opacity(0.7))
 
                         LazyVGrid(
                             columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
@@ -126,17 +128,17 @@ struct MessageTemplatePickerView: View {
                     }
                     .padding(.horizontal, 20)
 
-                    if messageVM.isGenerating {
-                        VStack(spacing: 12) {
-                            ProgressView()
-                                .tint(.cyan)
-                            Text("Generating…")
-                                .foregroundColor(.white.opacity(0.8))
-                                .font(.subheadline)
-                        }
-                        .padding(.top, 4)
-                    } else {
-                        VStack(spacing: 12) {
+                    VStack(spacing: 12) {
+                        if messageVM.isGenerating {
+                            VStack(spacing: 12) {
+                                ProgressView()
+                                    .tint(AppTheme.accent)
+                                Text("Generating…")
+                                    .foregroundColor(AppTheme.text.opacity(0.8))
+                                    .font(.subheadline)
+                            }
+                            .padding(.vertical, 8)
+                        } else {
                             Button {
                                 Task {
                                     await generateMessage(tone: selectedTone, contact: contact)
@@ -148,34 +150,37 @@ struct MessageTemplatePickerView: View {
                                     Text("Generate")
                                         .font(.headline)
                                 }
-                                .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
-                                .background(Color.blue)
-                                .cornerRadius(16)
-                                .shadow(color: Color.black.opacity(0.3), radius: 12, x: 0, y: 6)
                             }
+                            .primaryGlassButton()
+                            .tint(.blue)
 
                             if !llmReady {
                                 Text(messagePreview(for: selectedTone, contact: contact))
                                     .font(.caption)
-                                    .foregroundColor(.white.opacity(0.5))
+                                    .foregroundColor(AppTheme.text.opacity(0.5))
                                     .multilineTextAlignment(.center)
                                     .padding(.horizontal, 8)
                             }
                         }
-                        .padding(.horizontal, 20)
-                    }
 
-                    Button("Cancel") {
-                        dismiss()
+                        Button {
+                            dismiss()
+                        } label: {
+                            Text("Cancel")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                        }
+                        .secondaryGlassButton()
                     }
-                    .foregroundColor(.white.opacity(0.6))
+                    .padding(.horizontal, 20)
                     .padding(.bottom, 20)
-                    .padding(.top, 8)
+                    .padding(.top, 4)
                 } else {
                     Text("No contact selected")
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(AppTheme.text.opacity(0.6))
                 }
             }
         }
@@ -183,74 +188,62 @@ struct MessageTemplatePickerView: View {
         .simultaneousGesture(TapGesture().onEnded { isNoteFieldFocused = false })
     }
 
+    @ViewBuilder
     private func styleCard(for tone: MessageTone) -> some View {
         let isSelected = selectedTone == tone
-        return Button {
+        let card = Button {
             selectedTone = isSelected ? nil : tone
         } label: {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     Image(systemName: tone.systemImage)
                         .font(.title3)
-                        .foregroundStyle(.cyan)
+                        .foregroundStyle(AppTheme.accent)
                     Spacer()
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(isSelected ? .cyan : .white.opacity(0.35))
+                        .foregroundColor(isSelected ? AppTheme.accent : AppTheme.text.opacity(0.35))
                 }
                 Text(tone.displayName)
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(AppTheme.text)
             }
             .padding(16)
             .frame(maxWidth: .infinity, minHeight: 88, alignment: .topLeading)
-            .background(glassCardBackground(isSelected: isSelected))
         }
-        .buttonStyle(.plain)
+        .browseGlassButtonStyle(isProminent: isSelected)
         .accessibilityLabel(tone.displayName)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+
+        if isSelected {
+            card.tint(AppTheme.accent)
+        } else {
+            card
+        }
     }
 
     // MARK: - Editor
 
     private var messageEditorScreen: some View {
         VStack(spacing: 20) {
-            ZStack {
-                HStack {
-                    Button {
-                        showEditor = false
-                    } label: {
-                        Label("Back", systemImage: "chevron.left")
-                    }
-                    .foregroundColor(.cyan)
-                    Spacer()
-                }
-
-                Text("Edit Message")
-                    .font(.headline)
-                    .foregroundColor(.white)
-            }
-            .padding(.horizontal)
-            .padding(.top, 12)
-
             VStack(alignment: .leading, spacing: 8) {
                 Text("Preview:")
                     .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(AppTheme.text.opacity(0.7))
                     .padding(.horizontal)
 
                 ZStack(alignment: .bottom) {
                     TextEditor(text: $editableMessage)
                         .frame(minHeight: 150)
                         .padding(12)
-                        .background(glassFieldBackground)
-                        .foregroundColor(.white)
+                        .liquidGlassCard(cornerRadius: LiquidGlass.fieldCornerRadius)
+                        .foregroundColor(AppTheme.text)
                         .font(.body)
                         .scrollContentBackground(.hidden)
 
                     if copiedConfirmation {
                         Label("Copied", systemImage: "checkmark.circle.fill")
                             .font(.subheadline.weight(.semibold))
-                            .foregroundColor(.white)
+                            .foregroundColor(AppTheme.text)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
                             .background(
@@ -258,7 +251,7 @@ struct MessageTemplatePickerView: View {
                                     .fill(AppTheme.surface.opacity(0.92))
                                     .overlay(
                                         Capsule()
-                                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                            .stroke(AppTheme.text.opacity(0.2), lineWidth: 1)
                                     )
                             )
                             .padding(.bottom, 16)
@@ -313,20 +306,19 @@ struct MessageTemplatePickerView: View {
                 HStack(spacing: 10) {
                     Image(systemName: "message.fill")
                         .font(.title3)
-                    Text("Send via Messages")
+                    Text("Send on iMessage")
                         .font(.headline)
                 }
-                .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(Color.blue)
-                .cornerRadius(16)
-                .shadow(color: Color.black.opacity(0.3), radius: 12, x: 0, y: 6)
             }
+            .primaryGlassButton()
+            .tint(.blue)
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
         }
-        .padding(.top, 8)
+        .largeNavigationTitle("Edit Message")
+        .liquidGlassBackToolbar { showEditor = false }
         .animation(.easeInOut(duration: 0.2), value: copiedConfirmation)
     }
 
@@ -339,7 +331,7 @@ struct MessageTemplatePickerView: View {
             }
             Text(messageVM.lastGenerationSource.displayName)
                 .font(.caption)
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(AppTheme.text.opacity(0.6))
         }
     }
 
@@ -354,45 +346,23 @@ struct MessageTemplatePickerView: View {
             VStack(spacing: 8) {
                 if isBusy {
                     ProgressView()
-                        .tint(.cyan)
+                        .tint(AppTheme.accent)
                         .frame(height: 22)
                 } else {
                     Image(systemName: systemImage)
                         .font(.title3)
-                        .foregroundStyle(enabled ? Color.cyan : Color.white.opacity(0.3))
                 }
                 Text(title)
                     .font(.caption)
                     .fontWeight(.semibold)
-                    .foregroundColor(enabled ? .white.opacity(0.85) : .white.opacity(0.3))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
-            .background(glassCardBackground(isSelected: false))
         }
-        .buttonStyle(.plain)
+        .secondaryGlassButton()
+        .tint(AppTheme.accent)
         .disabled(!enabled || isBusy)
         .accessibilityLabel(title)
-    }
-
-    // MARK: - Glass helpers
-
-    private var glassFieldBackground: some View {
-        RoundedRectangle(cornerRadius: 12)
-            .fill(AppTheme.surface.opacity(0.5))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
-            )
-    }
-
-    private func glassCardBackground(isSelected: Bool) -> some View {
-        RoundedRectangle(cornerRadius: 12)
-            .fill(AppTheme.surface.opacity(isSelected ? 0.75 : 0.5))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.cyan.opacity(0.75) : Color.white.opacity(0.2), lineWidth: isSelected ? 2 : 1)
-            )
     }
 
     // MARK: - Generate / rewrite / undo

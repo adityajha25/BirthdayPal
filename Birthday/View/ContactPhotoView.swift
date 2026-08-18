@@ -17,15 +17,15 @@ struct ContactPhotoView: View {
             } else {
                 ZStack {
                     Circle()
-                        .fill(Color(red: 0.15, green: 0.2, blue: 0.4).opacity(0.9))
+                        .fill(AppTheme.badgeFill.opacity(0.9))
                     if let initials = Self.initials(from: name) {
                         Text(initials)
                             .font(.system(size: size * 0.36, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.92))
+                            .foregroundStyle(AppTheme.text.opacity(0.92))
                     } else {
                         Image(systemName: "person.fill")
                             .font(.system(size: size * 0.42, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.75))
+                            .foregroundStyle(AppTheme.text.opacity(0.75))
                     }
                 }
             }
@@ -35,7 +35,7 @@ struct ContactPhotoView: View {
         .overlay {
             if showsStroke {
                 Circle()
-                    .stroke(Color.white.opacity(0.28), lineWidth: 1.5)
+                    .stroke(AppTheme.text.opacity(0.28), lineWidth: 1.5)
             }
         }
         .accessibilityHidden(true)
