@@ -14,6 +14,7 @@ struct SettingsView: View {
     @State private var initialPingDraft = ""
     @State private var showRefreshConfirmation = false
     @State private var refreshConfirmationTask: Task<Void, Never>?
+    @State private var isAppleModelAvailable = AppleIntelligence.status == .available
     @FocusState private var isInitialPingFocused: Bool
 
     var body: some View {
@@ -25,6 +26,11 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 28) {
                     notificationsSection
                     messagesSection
+
+                    if settings.aiAssistanceEnabled {
+                        modelProvidersSection
+                    }
+
                     displaySection
                     supportSection
                     aboutSection
@@ -36,6 +42,9 @@ struct SettingsView: View {
             .scrollDismissesKeyboard(.interactively)
         }
         .largeNavigationTitle("Settings")
+        .onAppear {
+            isAppleModelAvailable = AppleIntelligence.status == .available
+        }
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
@@ -163,6 +172,34 @@ struct SettingsView: View {
                 settingsLabel(
                     icon: "sparkles",
                     title: "AI Assistance",
+                )
+            }
+            .tint(AppTheme.accent)
+        }
+    }
+
+    /// Only lists providers the device can actually reach: the on-device model
+    /// row is hidden when Apple Intelligence is unavailable.
+    private var modelProvidersSection: some View {
+        settingsSection(title: "Model Providers") {
+            if isAppleModelAvailable {
+                Toggle(isOn: $settings.appleFoundationModelEnabled) {
+                    settingsLabel(
+                        icon: "apple.logo",
+                        title: "Apple Foundation Model",
+                        subtitle: "Hosted on This Device"
+                    )
+                }
+                .tint(AppTheme.accent)
+
+                Divider().overlay(AppTheme.text.opacity(0.12))
+            }
+
+            Toggle(isOn: $settings.openRouterEnabled) {
+                settingsLabel(
+                    icon: "cloud",
+                    title: "Google Gemma 4",
+                    subtitle: "Powered by OpenRouter"
                 )
             }
             .tint(AppTheme.accent)

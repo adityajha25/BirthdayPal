@@ -25,6 +25,9 @@ struct MainTabView: View {
     @State private var browsePath = NavigationPath()
     /// Widget/person deep link received before birthday contacts finished loading.
     @State private var pendingPersonContactID: String?
+    /// One-time nudge when the device supports Apple Intelligence but it is off.
+    @State private var showsAppleIntelligencePrompt = false
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -75,6 +78,21 @@ struct MainTabView: View {
         .task {
             contactsVM.loadContacts()
             applyPendingDeepLinkIfNeeded()
+            promptForAppleIntelligenceIfNeeded()
+        }
+        .alert(
+            "Turn On Apple Intelligence",
+            isPresented: $showsAppleIntelligencePrompt
+        ) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    openURL(url)
+                }
+            }
+
+            Button("Not Now", role: .cancel) { }
+        } message: {
+            Text("Your iPhone can write birthday messages privately on-device, but Apple Intelligence is turned off.\n\nOpen Settings, then go to Apple Intelligence & Siri and turn it on.")
         }
         .onOpenURL { url in
             handleDeepLink(url)
@@ -98,6 +116,23 @@ struct MainTabView: View {
             Text("Contact not found")
                 .foregroundStyle(AppTheme.text)
         }
+    }
+
+    /// Shown at most once, and only when the user can actually act on it:
+    /// the hardware supports Apple Intelligence and it simply is not enabled.
+    /// Ineligible devices and a still-downloading model are not the user's
+    /// problem to fix, so they are never prompted.
+    private func promptForAppleIntelligenceIfNeeded() {
+        let settings = AppSettings.shared
+
+        guard settings.aiAssistanceEnabled,
+              !settings.hasPromptedForAppleIntelligence,
+              AppleIntelligence.status.canBeFixedInSettings else {
+            return
+        }
+
+        settings.hasPromptedForAppleIntelligence = true
+        showsAppleIntelligencePrompt = true
     }
 
     private func handleDeepLink(_ url: URL) {
@@ -411,7 +446,9 @@ struct CompactBdayCard: View {
                         onSendMessage()
                     } label: {
                         Label("Send Message", systemImage: "message.fill")
-                            .font(.caption.weight(.semibold))
+                            .font(.caption2.weight(.semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
                     }

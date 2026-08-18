@@ -17,6 +17,9 @@ final class AppSettings: ObservableObject {
         static let showAgeTurning = "BirthdayPal.showAgeTurning"
         static let initialPingDays = "BirthdayPal.initialPingDays"
         static let aiAssistanceEnabled = "BirthdayPal.aiAssistanceEnabled"
+        static let didPromptAppleIntelligence = "BirthdayPal.didPromptAppleIntelligence"
+        static let appleFoundationModelEnabled = "BirthdayPal.appleFoundationModelEnabled"
+        static let openRouterEnabled = "BirthdayPal.openRouterEnabled"
     }
 
     /// Extra reminder N days before the birthday. `0` (or empty in Settings) means Off.
@@ -60,6 +63,16 @@ final class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(aiAssistanceEnabled, forKey: Keys.aiAssistanceEnabled) }
     }
 
+    /// Allows the on-device Apple Foundation Model as a generation source.
+    @Published var appleFoundationModelEnabled: Bool {
+        didSet { UserDefaults.standard.set(appleFoundationModelEnabled, forKey: Keys.appleFoundationModelEnabled) }
+    }
+
+    /// Allows the externally hosted Gemma model (via OpenRouter) as a generation source.
+    @Published var openRouterEnabled: Bool {
+        didSet { UserDefaults.standard.set(openRouterEnabled, forKey: Keys.openRouterEnabled) }
+    }
+
     /// Extra reminder N days before the birthday. `0` disables the initial ping (day-of still fires).
     @Published var initialPingDays: Int {
         didSet {
@@ -84,6 +97,18 @@ final class AppSettings: ObservableObject {
             let comps = Calendar.current.dateComponents([.hour, .minute], from: newValue)
             notificationHour = comps.hour ?? 9
             notificationMinute = comps.minute ?? 0
+        }
+    }
+
+    /// One-time nudge shown after install when the device supports Apple
+    /// Intelligence but the user has not enabled it. Not a user preference,
+    /// so it is read straight from defaults rather than published.
+    var hasPromptedForAppleIntelligence: Bool {
+        get {
+            UserDefaults.standard.bool(forKey: Keys.didPromptAppleIntelligence)
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: Keys.didPromptAppleIntelligence)
         }
     }
 
@@ -119,6 +144,16 @@ final class AppSettings: ObservableObject {
             aiAssistanceEnabled = true
         } else {
             aiAssistanceEnabled = defaults.bool(forKey: Keys.aiAssistanceEnabled)
+        }
+        if defaults.object(forKey: Keys.appleFoundationModelEnabled) == nil {
+            appleFoundationModelEnabled = true
+        } else {
+            appleFoundationModelEnabled = defaults.bool(forKey: Keys.appleFoundationModelEnabled)
+        }
+        if defaults.object(forKey: Keys.openRouterEnabled) == nil {
+            openRouterEnabled = true
+        } else {
+            openRouterEnabled = defaults.bool(forKey: Keys.openRouterEnabled)
         }
         if defaults.object(forKey: Keys.initialPingDays) == nil {
             initialPingDays = 0
