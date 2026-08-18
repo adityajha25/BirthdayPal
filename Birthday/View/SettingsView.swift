@@ -12,6 +12,8 @@ struct SettingsView: View {
 
     @State private var showShareSheet = false
     @State private var initialPingDraft = ""
+    @State private var showRefreshConfirmation = false
+    @State private var refreshConfirmationTask: Task<Void, Never>?
     @FocusState private var isInitialPingFocused: Bool
 
     var body: some View {
@@ -21,8 +23,6 @@ struct SettingsView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
-                    header
-
                     notificationsSection
                     displaySection
                     supportSection
@@ -34,8 +34,7 @@ struct SettingsView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         }
-        .toolbarBackground(AppTheme.background, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .largeNavigationTitle("Settings")
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
@@ -43,7 +42,7 @@ struct SettingsView: View {
                     isInitialPingFocused = false
                     commitInitialPingDraft(normalize: true)
                 }
-                .foregroundStyle(.cyan)
+                .foregroundStyle(AppTheme.accent)
             }
         }
         .task {
@@ -52,22 +51,22 @@ struct SettingsView: View {
         .onChange(of: settings.notificationHour) { _, _ in
             rescheduleNotifications()
         }
-            .onChange(of: settings.notificationMinute) { _, _ in
-                rescheduleNotifications()
+        .onChange(of: settings.notificationMinute) { _, _ in
+            rescheduleNotifications()
+        }
+        .onChange(of: settings.initialPingDays) { _, days in
+            let parsed = Int(initialPingDraft.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+            if parsed != days {
+                syncInitialPingDraft(from: days)
             }
-            .onChange(of: settings.initialPingDays) { _, days in
-                let parsed = Int(initialPingDraft.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
-                if parsed != days {
-                    syncInitialPingDraft(from: days)
-                }
-                rescheduleNotifications()
+            rescheduleNotifications()
+        }
+        .onChange(of: isInitialPingFocused) { _, focused in
+            if !focused {
+                commitInitialPingDraft(normalize: true)
             }
-            .onChange(of: isInitialPingFocused) { _, focused in
-                if !focused {
-                    commitInitialPingDraft(normalize: true)
-                }
-            }
-            .onChange(of: settings.notificationsEnabled) { _, enabled in
+        }
+        .onChange(of: settings.notificationsEnabled) { _, enabled in
             if enabled {
                 BirthdayNotificationManager.shared.requestAuthorizationIfNeeded()
                 rescheduleNotifications()
@@ -80,18 +79,6 @@ struct SettingsView: View {
         }
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Settings")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .foregroundStyle(.white)
-            Text("Notifications, support, and more")
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.7))
-        }
-    }
-
     // MARK: - Sections
 
     private var notificationsSection: some View {
@@ -99,9 +86,9 @@ struct SettingsView: View {
             Toggle(isOn: $settings.notificationsEnabled) {
                 settingsLabel(icon: "bell.fill", title: "Birthday reminders")
             }
-            .tint(.cyan)
+            .tint(AppTheme.accent)
 
-            Divider().overlay(Color.white.opacity(0.12))
+            Divider().overlay(AppTheme.text.opacity(0.12))
 
             DatePicker(
                 "Reminder time",
@@ -111,13 +98,12 @@ struct SettingsView: View {
                 ),
                 displayedComponents: .hourAndMinute
             )
-            .foregroundStyle(.white)
-            .tint(.cyan)
-            .colorScheme(.dark)
+            .foregroundStyle(AppTheme.text)
+            .tint(AppTheme.accent)
             .disabled(!settings.notificationsEnabled)
             .opacity(settings.notificationsEnabled ? 1 : 0.45)
 
-            Divider().overlay(Color.white.opacity(0.12))
+            Divider().overlay(AppTheme.text.opacity(0.12))
 
             VStack(alignment: .leading, spacing: 12) {
                 settingsLabel(icon: "bell.badge", title: "Initial ping")
@@ -126,7 +112,7 @@ struct SettingsView: View {
                     TextField(
                         "",
                         text: initialPingDraftBinding,
-                        prompt: Text("Off").foregroundStyle(.white.opacity(0.35))
+                        prompt: Text("Off").foregroundStyle(AppTheme.text.opacity(0.35))
                     )
                     .keyboardType(.numberPad)
                     .textInputAutocapitalization(.never)
@@ -134,23 +120,16 @@ struct SettingsView: View {
                     .multilineTextAlignment(.center)
                     .focused($isInitialPingFocused)
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(AppTheme.text)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 8)
                     .frame(minWidth: 52, maxWidth: 64)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.white.opacity(0.08))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(Color.cyan.opacity(isInitialPingFocused ? 0.55 : 0.18), lineWidth: 1)
-                    )
+                    .liquidGlassCard(cornerRadius: 10)
                     .accessibilityLabel("Days before birthday")
 
                     Text(settings.initialPingDays == 1 ? "day before" : "days before")
                         .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.65))
+                        .foregroundStyle(AppTheme.text.opacity(0.65))
                         .lineLimit(1)
 
                     Spacer(minLength: 4)
@@ -161,23 +140,19 @@ struct SettingsView: View {
                         in: 0...AppSettings.initialPingDaysMax
                     )
                     .labelsHidden()
-                    .tint(.cyan)
+                    .tint(AppTheme.accent)
                     .fixedSize()
                     .accessibilityLabel("Initial ping days")
                 }
             }
-            .colorScheme(.dark)
             .disabled(!settings.notificationsEnabled)
             .opacity(settings.notificationsEnabled ? 1 : 0.45)
 
-            Divider().overlay(Color.white.opacity(0.12))
+            Divider().overlay(AppTheme.text.opacity(0.12))
 
-            Button {
+            settingsActionButton(icon: "gear", title: "System notification settings") {
                 openSystemSettings()
-            } label: {
-                settingsRow(icon: "gear", title: "System notification settings")
             }
-            .buttonStyle(.plain)
         }
     }
 
@@ -186,58 +161,93 @@ struct SettingsView: View {
             Toggle(isOn: $settings.showAgeTurning) {
                 settingsLabel(icon: "cake", title: "Show age turning")
             }
-            .tint(.cyan)
+            .tint(AppTheme.accent)
 
-            Divider().overlay(Color.white.opacity(0.12))
+            Divider().overlay(AppTheme.text.opacity(0.12))
 
-            Button {
-                contactsVM.loadContacts(force: true)
-                contactsVM.loadMissingBirthdayContactsIfNeeded(force: true)
-            } label: {
-                settingsRow(icon: "arrow.clockwise", title: "Refresh contacts")
-            }
-            .buttonStyle(.plain)
+            refreshContactsRow
         }
+    }
+
+    /// Refresh with visible feedback: a spinner while the fetch runs, then a short "Updated" note.
+    private var refreshContactsRow: some View {
+        Button {
+            refreshContacts()
+        } label: {
+            HStack(spacing: 12) {
+                settingsLabel(
+                    icon: "arrow.clockwise",
+                    title: "Refresh contacts",
+                    subtitle: showRefreshConfirmation ? "Updated just now" : nil
+                )
+
+                Spacer(minLength: 0)
+
+                if contactsVM.isRefreshingContacts {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .tint(AppTheme.accent)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(contactsVM.isRefreshingContacts)
+        .animation(.easeInOut(duration: 0.2), value: contactsVM.isRefreshingContacts)
+        .animation(.easeInOut(duration: 0.2), value: showRefreshConfirmation)
+        .onChange(of: contactsVM.isRefreshingContacts) { wasRefreshing, isRefreshing in
+            guard wasRefreshing, !isRefreshing else { return }
+            showRefreshConfirmation = true
+            refreshConfirmationTask?.cancel()
+            refreshConfirmationTask = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled else { return }
+                showRefreshConfirmation = false
+            }
+        }
+        .onDisappear { refreshConfirmationTask?.cancel() }
+    }
+
+    private func refreshContacts() {
+        showRefreshConfirmation = false
+        refreshConfirmationTask?.cancel()
+        contactsVM.refreshAllContacts()
     }
 
     private var supportSection: some View {
         settingsSection(title: "Support & Sharing") {
-            Button {
+            settingsActionButton(icon: "star.fill", title: "Rate on the App Store") {
                 openURL(AppSettings.writeReviewURL)
-            } label: {
-                settingsRow(icon: "star.fill", title: "Rate on the App Store")
             }
-            .buttonStyle(.plain)
 
-            Divider().overlay(Color.white.opacity(0.12))
+            Divider().overlay(AppTheme.text.opacity(0.12))
 
-            Button {
+            settingsActionButton(icon: "square.and.arrow.up", title: "Send to a friend") {
                 showShareSheet = true
-            } label: {
-                settingsRow(icon: "square.and.arrow.up", title: "Send to a friend")
             }
-            .buttonStyle(.plain)
 
-            Divider().overlay(Color.white.opacity(0.12))
+            Divider().overlay(AppTheme.text.opacity(0.12))
 
-            Button {
+            settingsActionButton(
+                icon: "envelope.fill",
+                title: "Contact us",
+                subtitle: AppSettings.supportEmail
+            ) {
                 openMail(
                     to: AppSettings.supportEmail,
                     subject: "BirthdayPal Support",
                     body: "Hi BirthdayPal team,\n\n"
                 )
-            } label: {
-                settingsRow(
-                    icon: "envelope.fill",
-                    title: "Contact us",
-                    subtitle: AppSettings.supportEmail
-                )
             }
-            .buttonStyle(.plain)
 
-            Divider().overlay(Color.white.opacity(0.12))
+            Divider().overlay(AppTheme.text.opacity(0.12))
 
-            Button {
+            settingsActionButton(
+                icon: "exclamationmark.bubble.fill",
+                title: "Report a bug",
+                subtitle: "Email with device details filled in"
+            ) {
                 openMail(
                     to: AppSettings.supportEmail,
                     subject: "BirthdayPal Bug Report",
@@ -256,14 +266,7 @@ struct SettingsView: View {
 
                     """
                 )
-            } label: {
-                settingsRow(
-                    icon: "exclamationmark.bubble.fill",
-                    title: "Report a bug",
-                    subtitle: "Email with device details filled in"
-                )
             }
-            .buttonStyle(.plain)
         }
     }
 
@@ -278,14 +281,11 @@ struct SettingsView: View {
                 Spacer()
             }
 
-            Divider().overlay(Color.white.opacity(0.12))
+            Divider().overlay(AppTheme.text.opacity(0.12))
 
-            Button {
+            settingsActionButton(icon: "lock.shield.fill", title: "Privacy") {
                 openURL(AppSettings.appStoreURL)
-            } label: {
-                settingsRow(icon: "lock.shield.fill", title: "Privacy")
             }
-            .buttonStyle(.plain)
         }
     }
 
@@ -299,15 +299,14 @@ struct SettingsView: View {
             Text(title.uppercased())
                 .font(.caption)
                 .fontWeight(.semibold)
-                .foregroundStyle(.white.opacity(0.55))
+                .foregroundStyle(AppTheme.text.opacity(0.55))
                 .padding(.leading, 4)
 
-            GlassCard(intensity: .strong) {
-                VStack(alignment: .leading, spacing: 16) {
-                    content()
-                }
-                .padding(20)
+            VStack(alignment: .leading, spacing: 16) {
+                content()
             }
+            .padding(20)
+            .liquidGlassCard(cornerRadius: LiquidGlass.cardCornerRadius)
         }
     }
 
@@ -315,35 +314,39 @@ struct SettingsView: View {
         HStack(spacing: 14) {
             Image(systemName: icon)
                 .font(.body)
-                .foregroundStyle(Color.cyan)
+                .foregroundStyle(AppTheme.accent)
                 .frame(width: 28)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.body)
                     .fontWeight(.semibold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(AppTheme.text)
                 if let subtitle {
                     Text(subtitle)
                         .font(.caption)
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(AppTheme.text.opacity(0.6))
                 }
             }
         }
     }
 
-    private func settingsRow(icon: String, title: String, subtitle: String? = nil) -> some View {
-        HStack {
-            settingsLabel(icon: icon, title: title, subtitle: subtitle)
-            Spacer()
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .fontWeight(.bold)
-                .foregroundStyle(.white.opacity(0.35))
+    private func settingsActionButton(
+        icon: String,
+        title: String,
+        subtitle: String? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack {
+                settingsLabel(icon: icon, title: title, subtitle: subtitle)
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
-        .contentShape(Rectangle())
+        .buttonStyle(.plain)
     }
-
 
     private var initialPingDraftBinding: Binding<String> {
         Binding(

@@ -16,8 +16,8 @@ struct MyApp: App {
     }
     var body: some Scene {
         WindowGroup {
+            // No preferredColorScheme — the app follows the device appearance.
             ContentView()
-                .preferredColorScheme(.dark)
         }
     }
 }

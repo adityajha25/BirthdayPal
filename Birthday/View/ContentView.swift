@@ -5,225 +5,71 @@ import MessageUI
 
 struct ContentView: View {
     var body: some View {
-        LandingPage()
+        MainTabView()
     }
 }
 
-struct LandingPage: View {
+// MARK: - Root Tab Navigation
+
+private enum AppTab: Hashable {
+    case today
+    case browse
+    case addMissing
+    case settings
+}
+
+struct MainTabView: View {
     @StateObject private var contactsVM = ContactViewModel()
-    @State private var path = NavigationPath()
-    @State private var comingUpScrollID: String?
+    @State private var selectedTab: AppTab = .today
+    @State private var todayPath = NavigationPath()
+    @State private var browsePath = NavigationPath()
     /// Widget/person deep link received before birthday contacts finished loading.
     @State private var pendingPersonContactID: String?
 
-    private enum Route: Hashable {
-        case browse
-        case addMissing
-        case edit(String)
-        case settings
-        case todaysBirthdays
-    }
-
-    private let comingUpCardWidth: CGFloat = CompactBdayCard.width
-    private let comingUpCardHeight: CGFloat = CompactBdayCard.height
-    private let comingUpCardSpacing: CGFloat = 16
-
     var body: some View {
-        NavigationStack(path: $path) {
-            GeometryReader { geometry in
-                ZStack {
-                    // Simple solid background
-                    AppTheme.background
-                        .ignoresSafeArea()
-                    
-                    VStack(spacing: 0) {
-                        // Header - Center Aligned
-                        ZStack(alignment: .trailing) {
-                            VStack(spacing: 8) {
-                                Image(systemName: "birthday.cake.fill")
-                                    .font(.system(size: 34))
-                                    .foregroundStyle(.cyan)
-                                Text("BirthdayPal")
-                                    .foregroundStyle(.white)
-                                    .font(.system(size: 36, weight: .bold))
-                            }
-                            .frame(maxWidth: .infinity)
-                            
-                            Button {
-                                path.append(Route.settings)
-                            } label: {
-                                Image(systemName: "gearshape.fill")
-                                    .font(.title3)
-                                    .foregroundStyle(.white.opacity(0.85))
-                                    .padding(10)
-                                    .background(
-                                        Circle()
-                                            .fill(Color.white.opacity(0.12))
-                                    )
-                            }
-                            .padding(.trailing, 20)
-                            .accessibilityLabel("Settings")
-                        }
-                        .padding(.top, 20)
-                        .padding(.bottom, 32)
-                        
-                        ScrollView(showsIndicators: false) {
-                            VStack(spacing: 28) {
-                                // Top 3 Birthdays - Horizontal Scroll
-                                if contactsVM.isLoadingBirthdays {
-                                    VStack(spacing: 16) {
-                                        ProgressView()
-                                            .tint(.white)
-                                            .scaleEffect(1.5)
-                                        Text("Loading contacts...")
-                                            .foregroundColor(.white.opacity(0.8))
-                                            .font(.subheadline)
-                                    }
-                                    .frame(height: 200)
-                                } else if let error = contactsVM.errorMessage {
-                                    GlassCard {
-                                        VStack(spacing: 16) {
-                                            Image(systemName: "exclamationmark.triangle.fill")
-                                                .font(.system(size: 50))
-                                                .foregroundStyle(
-                                                    LinearGradient(
-                                                        colors: [.orange, .red],
-                                                        startPoint: .top,
-                                                        endPoint: .bottom
-                                                    )
-                                                )
-                                            Text("Error loading contacts")
-                                                .foregroundStyle(.white)
-                                                .font(.headline)
-                                            Text(error)
-                                                .foregroundStyle(.white.opacity(0.7))
-                                                .multilineTextAlignment(.center)
-                                                .font(.subheadline)
-                                            
-                                            Button("Retry") {
-                                                contactsVM.loadContacts(force: true)
-                                            }
-                                            .modernButtonStyle()
-                                        }
-                                        .padding(24)
-                                    }
-                                    .padding(.horizontal, 20)
-                                } else if contactsVM.contactsWithBirthday.isEmpty {
-                                    GlassCard {
-                                        VStack(spacing: 16) {
-                                            Image(systemName: "birthday.cake.fill")
-                                                .font(.system(size: 60))
-                                                .foregroundStyle(.cyan)
-                                            Text("No upcoming birthdays")
-                                                .foregroundStyle(.white)
-                                                .font(.title3)
-                                                .fontWeight(.semibold)
-                                            Text("Add birthdays to your contacts to see them here")
-                                                .foregroundStyle(.white.opacity(0.7))
-                                                .multilineTextAlignment(.center)
-                                                .font(.subheadline)
-                                        }
-                                        .padding(32)
-                                    }
-                                    .padding(.horizontal, 20)
-                                } else {
-                                    VStack(alignment: .leading, spacing: 12) {
-                                        HStack {
-                                            Label("Coming Up", systemImage: "clock.badge.checkmark")
-                                                .font(.title2)
-                                                .fontWeight(.bold)
-                                                .foregroundStyle(.white)
-                                            Spacer()
-                                            Text("\(contactsVM.upcomingPreview.count) upcoming")
-                                                .font(.subheadline)
-                                                .foregroundStyle(.white.opacity(0.6))
-                                        }
-                                        .padding(.horizontal, 24)
-                                        
-                                        ComingUpCarousel(
-                                            contacts: contactsVM.upcomingPreview,
-                                            scrollID: $comingUpScrollID,
-                                            cardWidth: comingUpCardWidth,
-                                            cardHeight: comingUpCardHeight,
-                                            spacing: comingUpCardSpacing,
-                                            containerWidth: geometry.size.width
-                                        ) { contactID in
-                                            path.append(Route.edit(contactID))
-                                        }
-                                    }
-                                }
-                                
-                                // Achievement Card
-                                AchievementCardView(rememberedCount: contactsVM.rememberedBirthdaysCount)
-                                    .padding(.horizontal, 20)
-                                
-                                // Today's Birthdays
-                                Button {
-                                    path.append(Route.todaysBirthdays)
-                                } label: {
-                                    ActionCard(
-                                        icon: "birthday.cake.fill",
-                                        title: "Today's Birthdays",
-                                        showsTodayIndicator: !contactsVM.todaysBirthdays.isEmpty,
-                                        gradientColors: [Color.orange, Color.pink]
-                                    )
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                                .padding(.horizontal, 20)
-                                
-                                // Browse Birthdays Button
-                                Button {
-                                    path.append(Route.browse)
-                                } label: {
-                                    ActionCard(
-                                        icon: "calendar",
-                                        title: "Browse by Month",
-                                        gradientColors: [Color.blue, Color.cyan]
-                                    )
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                                .padding(.horizontal, 20)
-                                
-                                // Add Missing Birthdays Button
-                                Button {
-                                    path.append(Route.addMissing)
-                                } label: {
-                                    ActionCard(
-                                        icon: "person.2.fill",
-                                        title: "Add missing birthdays",
-                                        gradientColors: [Color.purple, Color.blue]
-                                    )
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                                .padding(.horizontal, 20)
-                                .padding(.bottom, 24)
-                            }
-                        }
-                    }
+        TabView(selection: $selectedTab) {
+            NavigationStack(path: $todayPath) {
+                TodayTabView(contactsVM: contactsVM) { contactID in
+                    todayPath.append(contactID)
                 }
-                .frame(width: geometry.size.width, height: geometry.size.height)
-            }
-            .navigationDestination(for: Route.self) { route in
-                switch route {
-                case .browse:
-                    BrowseBirthdaysView(contactsVM: contactsVM)
-                case .addMissing:
-                    addMissingView(contactsVM: contactsVM)
-                case .edit(let contactID):
-                    if let contact = contactsVM.contact(withId: contactID) {
-                        EditView(contact: contact, contactsVM: contactsVM)
-                    } else {
-                        Text("Contact not found")
-                            .foregroundStyle(.white)
-                    }
-                case .settings:
-                    SettingsView(contactsVM: contactsVM)
-                case .todaysBirthdays:
-                    TodaysBirthdaysView(contactsVM: contactsVM) { contactID in
-                        path.append(Route.edit(contactID))
-                    }
+                .navigationDestination(for: String.self) { contactID in
+                    contactEditDestination(contactID)
                 }
             }
+            .tabItem {
+                Label("Today", systemImage: "birthday.cake.fill")
+            }
+            .tag(AppTab.today)
+
+            NavigationStack(path: $browsePath) {
+                BrowseBirthdaysView(contactsVM: contactsVM)
+                    .navigationDestination(for: String.self) { contactID in
+                        contactEditDestination(contactID)
+                    }
+            }
+            .tabItem {
+                Label("Browse", systemImage: "calendar")
+            }
+            .tag(AppTab.browse)
+
+            NavigationStack {
+                addMissingView(contactsVM: contactsVM)
+                    .navigationDestination(for: String.self) { contactID in
+                        contactEditDestination(contactID)
+                    }
+            }
+            .tabItem {
+                Label("Add", systemImage: "person.crop.circle.badge.plus")
+            }
+            .tag(AppTab.addMissing)
+
+            NavigationStack {
+                SettingsView(contactsVM: contactsVM)
+            }
+            .tabItem {
+                Label("Settings", systemImage: "gearshape.fill")
+            }
+            .tag(AppTab.settings)
         }
         .environmentObject(AppSettings.shared)
         .task {
@@ -244,6 +90,16 @@ struct LandingPage: View {
         }
     }
 
+    @ViewBuilder
+    private func contactEditDestination(_ contactID: String) -> some View {
+        if let contact = contactsVM.contact(withId: contactID) {
+            EditView(contact: contact, contactsVM: contactsVM)
+        } else {
+            Text("Contact not found")
+                .foregroundStyle(AppTheme.text)
+        }
+    }
+
     private func handleDeepLink(_ url: URL) {
         guard let link = DeepLink.from(url: url) else { return }
         navigate(to: link)
@@ -258,8 +114,8 @@ struct LandingPage: View {
         switch link {
         case .todaysBirthdays:
             pendingPersonContactID = nil
-            path = NavigationPath()
-            path.append(Route.todaysBirthdays)
+            selectedTab = .today
+            todayPath = NavigationPath()
         case .person(let contactID):
             pendingPersonContactID = contactID
             attemptPendingPersonNavigation()
@@ -270,134 +126,162 @@ struct LandingPage: View {
     private func attemptPendingPersonNavigation() {
         guard let contactID = pendingPersonContactID else { return }
 
+        selectedTab = .today
+
         if contactsVM.contact(withId: contactID) != nil {
-            path = NavigationPath()
-            path.append(Route.edit(contactID))
+            todayPath = NavigationPath()
+            todayPath.append(contactID)
             pendingPersonContactID = nil
             return
         }
 
         guard !contactsVM.isLoadingBirthdays else { return }
 
-        path = NavigationPath()
-        path.append(Route.edit(contactID))
+        todayPath = NavigationPath()
+        todayPath.append(contactID)
         pendingPersonContactID = nil
     }
 }
 
-// MARK: - Today's Birthdays
+// MARK: - Today Tab
 
-struct TodaysBirthdaysView: View {
+struct TodayTabView: View {
     @ObservedObject var contactsVM: ContactViewModel
     var onSelectContact: (String) -> Void
+    @State private var scrollID: String?
+
+    private let cardWidth: CGFloat = CompactBdayCard.width
+    private let cardSpacing: CGFloat = 16
+
+    private var upcomingBirthdays: [Contact] {
+        contactsVM.upcomingPreview
+    }
 
     var body: some View {
         ZStack {
             AppTheme.background
                 .ignoresSafeArea()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("Today's Birthdays", systemImage: "birthday.cake.fill")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .foregroundStyle(.white)
-                        Text(Date().formattedDate())
-                            .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.7))
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 20)
+            GeometryReader { geometry in
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 28) {
+                        if contactsVM.isLoadingBirthdays {
+                            loadingState
+                        } else if let error = contactsVM.errorMessage {
+                            errorState(error)
+                        } else if upcomingBirthdays.isEmpty {
+                            emptyState
+                        } else {
+                            birthdayCarousel(containerWidth: geometry.size.width)
+                        }
 
-                    if contactsVM.isLoadingBirthdays {
-                        ProgressView()
-                            .tint(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 40)
-                    } else if contactsVM.todaysBirthdays.isEmpty {
-                        Text("No Birthdays today")
-                            .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.7))
-                            .padding(.horizontal, 24)
-                    } else {
-                        LazyVStack(spacing: 16) {
-                            ForEach(contactsVM.todaysBirthdays) { contact in
-                                Button {
-                                    onSelectContact(contact.id)
-                                } label: {
-                                    BdayCard(contact: contact)
-                                }
-                                .buttonStyle(.plain)
+                        if !contactsVM.isLoadingBirthdays, contactsVM.errorMessage == nil {
+                            AchievementCardView(rememberedCount: contactsVM.rememberedBirthdaysCount)
                                 .padding(.horizontal, 20)
-                            }
                         }
                     }
+                    .padding(.bottom, 32)
                 }
-                .padding(.bottom, 32)
             }
+        }
+        .largeNavigationTitle("Today")
+        .onAppear { syncScrollID() }
+        .onChange(of: upcomingBirthdays.map(\.id)) { _, _ in
+            syncScrollID()
+        }
+    }
+
+    private var loadingState: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .tint(AppTheme.text)
+                .scaleEffect(1.5)
+            Text("Loading contacts...")
+                .foregroundStyle(AppTheme.text.opacity(0.8))
+                .font(.subheadline)
+        }
+        .frame(height: 280)
+    }
+
+    private func errorState(_ error: String) -> some View {
+        LiquidGlassCard(padding: 24) {
+            VStack(spacing: 16) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 50))
+                    .foregroundStyle(
+                        LinearGradient(colors: [.orange, .red], startPoint: .top, endPoint: .bottom)
+                    )
+                Text("Error loading contacts")
+                    .foregroundStyle(AppTheme.text)
+                    .font(.headline)
+                Text(error)
+                    .foregroundStyle(AppTheme.text.opacity(0.7))
+                    .multilineTextAlignment(.center)
+                    .font(.subheadline)
+
+                Button("Retry") {
+                    contactsVM.loadContacts(force: true)
+                }
+                .primaryGlassButton()
+                .tint(.blue)
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private var emptyState: some View {
+        LiquidGlassCard(padding: 32) {
+            VStack(spacing: 16) {
+                Image(systemName: "birthday.cake")
+                    .font(.system(size: 60))
+                    .foregroundStyle(AppTheme.accent)
+                Text("No upcoming birthdays")
+                    .foregroundStyle(AppTheme.text)
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                Text("Add birthdays in Contacts to see them here")
+                    .foregroundStyle(AppTheme.text.opacity(0.7))
+                    .multilineTextAlignment(.center)
+                    .font(.subheadline)
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private func birthdayCarousel(containerWidth: CGFloat) -> some View {
+        TodayBirthdayCarousel(
+            contacts: upcomingBirthdays,
+            scrollID: $scrollID,
+            cardWidth: cardWidth,
+            spacing: cardSpacing,
+            containerWidth: containerWidth,
+            onSelectContact: onSelectContact
+        )
+        .padding(.top, 8)
+    }
+
+    private func syncScrollID() {
+        guard !upcomingBirthdays.isEmpty else {
+            scrollID = nil
+            return
+        }
+        let initialID = upcomingBirthdays.first(where: { $0.daysToBirthday == 0 })?.id
+            ?? upcomingBirthdays.first?.id
+        if scrollID == nil || !upcomingBirthdays.contains(where: { $0.id == scrollID }) {
+            scrollID = initialID
         }
     }
 }
 
-// MARK: - Glass Card Component
+// MARK: - Today Birthday Carousel (CompactBdayCard layout)
 
-struct GlassCard<Content: View>: View {
-    let content: Content
-    let intensity: GlassIntensity
-    
-    enum GlassIntensity {
-        case light, medium, strong
-        
-        var backgroundOpacity: Double {
-            switch self {
-            case .light: return 0.4
-            case .medium: return 0.5
-            case .strong: return 0.6
-            }
-        }
-        
-        var borderOpacity: Double {
-            switch self {
-            case .light: return 0.15
-            case .medium: return 0.2
-            case .strong: return 0.25
-            }
-        }
-    }
-    
-    init(intensity: GlassIntensity = .medium, @ViewBuilder content: () -> Content) {
-        self.content = content()
-        self.intensity = intensity
-    }
-    
-    var body: some View {
-        content
-            .background(
-                ZStack {
-                    // Simple dark glass layer
-                    RoundedRectangle(cornerRadius: 24)
-                        .fill(AppTheme.surface.opacity(intensity.backgroundOpacity))
-                    
-                    // Subtle border
-                    RoundedRectangle(cornerRadius: 24)
-                        .stroke(Color.white.opacity(intensity.borderOpacity), lineWidth: 1)
-                }
-            )
-            .shadow(color: Color.black.opacity(0.3), radius: 15, x: 0, y: 8)
-    }
-}
-
-// MARK: - Coming Up Carousel
-
-private struct ComingUpCarousel: View {
+private struct TodayBirthdayCarousel: View {
     let contacts: [Contact]
     @Binding var scrollID: String?
     let cardWidth: CGFloat
-    let cardHeight: CGFloat
     let spacing: CGFloat
     let containerWidth: CGFloat
-    let onSelect: (String) -> Void
+    let onSelectContact: (String) -> Void
 
     private var sideInset: CGFloat {
         max((containerWidth - cardWidth) / 2, 24)
@@ -407,13 +291,13 @@ private struct ComingUpCarousel: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: spacing) {
                 ForEach(contacts) { contact in
-                    Button {
-                        onSelect(contact.id)
-                    } label: {
-                        CompactBdayCard(contact: contact)
-                    }
-                    .buttonStyle(.plain)
-                    .frame(width: cardWidth, height: cardHeight)
+                    let isToday = contact.daysToBirthday == 0
+                    CompactBdayCard(
+                        contact: contact,
+                        showsSendMessage: isToday,
+                        onSendMessage: isToday ? { onSelectContact(contact.id) } : nil
+                    )
+                    .frame(width: cardWidth, height: CompactBdayCard.height(showsSendMessage: isToday))
                     .id(contact.id)
                     .scrollTransition(.interactive, axis: .horizontal) { content, phase in
                         content
@@ -427,159 +311,101 @@ private struct ComingUpCarousel: View {
         .scrollTargetBehavior(.viewAligned)
         .scrollPosition(id: $scrollID)
         .contentMargins(.horizontal, sideInset, for: .scrollContent)
-        .frame(height: 280)
-        .onAppear {
-            syncScrollID()
-        }
-        .onChange(of: contacts.map(\.id)) { _, _ in
-            syncScrollID()
-        }
-    }
-
-    private func syncScrollID() {
-        guard let firstID = contacts.first?.id else {
-            scrollID = nil
-            return
-        }
-        if scrollID == nil || !contacts.contains(where: { $0.id == scrollID }) {
-            scrollID = firstID
-        }
+        .frame(height: 320)
     }
 }
 
-// MARK: - Compact Birthday Card (for horizontal scroll)
+// MARK: - Compact Birthday Card (original layout + liquid glass)
 
 struct CompactBdayCard: View {
     static let width: CGFloat = 200
-    static let height: CGFloat = 240
+    static let baseHeight: CGFloat = 240
+
+    static func height(showsSendMessage: Bool) -> CGFloat {
+        showsSendMessage ? 280 : baseHeight
+    }
 
     var contact: Contact
+    var showsSendMessage: Bool = false
+    var onSendMessage: (() -> Void)? = nil
     @EnvironmentObject private var settings: AppSettings
-    
+
     var body: some View {
-        GlassCard(intensity: .strong) {
-            VStack(spacing: 14) {
-                ContactPhotoView(name: contact.name, thumbnailData: contact.thumbnailData, size: 72)
+        VStack(spacing: 14) {
+            ContactPhotoView(name: contact.name, thumbnailData: contact.thumbnailData, size: 72)
 
-                VStack(spacing: 8) {
-                    Text(contact.name)
-                        .font(.headline)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .frame(maxWidth: .infinity)
+            VStack(spacing: 8) {
+                Text(contact.name)
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundStyle(AppTheme.text)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity)
 
-                    if let display = contact.displayBirthdayDate ?? contact.comparableBirthday {
-                        Text(display.formattedMonthDay())
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.white.opacity(0.65))
-                    }
-                    
-                    if settings.showAgeTurning, contact.hasKnownBirthYear, let age = contact.ageTurning {
-                        Text("Turning \(age)")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.white.opacity(0.75))
-                    }
-                    
-                    if let days = contact.daysToBirthday {
-                        HStack(spacing: 6) {
-                            if days == 0 {
-                                Image(systemName: "party.popper.fill")
-                                    .foregroundStyle(.yellow)
-                                    .font(.caption)
-                                Text("Today!")
-                                    .foregroundStyle(.yellow)
-                                    .font(.caption)
-                                    .fontWeight(.bold)
-                            } else {
-                                Image(systemName: "clock.fill")
-                                    .foregroundStyle(Color.cyan)
-                                    .font(.caption2)
-                                Text("\(days) days")
-                                    .foregroundStyle(.white.opacity(0.8))
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                            }
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                            Capsule()
-                                .fill(
-                                    AppTheme.background.opacity(0.6)
-                                )
-                                .overlay(
-                                    Capsule()
-                                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                                )
-                        )
-                    }
+                if let display = contact.displayBirthdayDate ?? contact.comparableBirthday {
+                    Text(display.formattedMonthDay())
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(AppTheme.text.opacity(0.65))
                 }
-            }
-            .padding(20)
-            .frame(width: Self.width, height: Self.height)
-        }
-    }
-}
 
-// MARK: - Action Card
-
-struct ActionCard: View {
-    let icon: String
-    let title: String
-    var subtitle: String? = nil
-    var showsTodayIndicator: Bool = false
-    let gradientColors: [Color]
-    
-    var body: some View {
-        GlassCard(intensity: .strong) {
-            HStack(spacing: 20) {
-                // Simple icon container
-                ZStack {
-                    RoundedRectangle(cornerRadius: 18)
-                        .fill(gradientColors[0].opacity(0.3))
-                        .frame(width: 64, height: 64)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 18)
-                                .stroke(Color.white.opacity(0.3), lineWidth: 1.5)
-                        )
-                    
-                    Image(systemName: icon)
-                        .font(.system(size: 26, weight: .semibold))
-                        .foregroundColor(.white)
+                if settings.showAgeTurning, contact.hasKnownBirthYear, let age = contact.ageTurning {
+                    Text("Turning \(age)")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(AppTheme.text.opacity(0.75))
                 }
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 8) {
-                        Text(title)
-                            .foregroundStyle(.white)
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                        if showsTodayIndicator {
-                            Circle()
-                                .fill(Color.orange)
-                                .frame(width: 8, height: 8)
+
+                if let days = contact.daysToBirthday {
+                    HStack(spacing: 6) {
+                        if days == 0 {
+                            Image(systemName: "party.popper.fill")
+                                .foregroundStyle(AppTheme.celebration)
+                                .font(.caption)
+                            Text("Today!")
+                                .foregroundStyle(AppTheme.celebration)
+                                .font(.caption)
+                                .fontWeight(.bold)
+                        } else {
+                            Image(systemName: "clock.fill")
+                                .foregroundStyle(AppTheme.accent)
+                                .font(.caption2)
+                            Text("\(days) days")
+                                .foregroundStyle(AppTheme.text.opacity(0.8))
+                                .font(.caption)
+                                .fontWeight(.medium)
                         }
                     }
-                    if let subtitle {
-                        Text(subtitle)
-                            .foregroundStyle(.white.opacity(0.7))
-                            .font(.subheadline)
-                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(AppTheme.background.opacity(0.6))
+                            .overlay(
+                                Capsule()
+                                    .stroke(AppTheme.text.opacity(0.15), lineWidth: 1)
+                            )
+                    )
                 }
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .foregroundColor(.white.opacity(0.4))
-                    .font(.system(size: 16, weight: .bold))
+
+                if showsSendMessage, contact.daysToBirthday == 0, let onSendMessage {
+                    Button(action: onSendMessage) {
+                        Label("Send Message", systemImage: "message.fill")
+                            .font(.caption.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                    }
+                    .primaryGlassButton()
+                    .tint(.blue)
+                    .padding(.top, 4)
+                }
             }
-            .padding(24)
         }
+        .padding(20)
+        .frame(width: Self.width, height: Self.height(showsSendMessage: showsSendMessage))
+        .liquidGlassCard(cornerRadius: LiquidGlass.cardCornerRadius, interactive: true)
     }
 }
 
@@ -589,33 +415,33 @@ struct AchievementCardView: View {
     let rememberedCount: Int
 
     var body: some View {
-        GlassCard(intensity: .strong) {
+        LiquidGlassCard(padding: 24) {
             HStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack(spacing: 8) {
                         Image(systemName: "sparkles")
-                            .foregroundStyle(.yellow)
+                            .foregroundStyle(AppTheme.celebration)
                             .font(.title2)
                         Text("This Month")
                             .font(.subheadline)
                             .fontWeight(.semibold)
-                            .foregroundColor(.white.opacity(0.9))
+                            .foregroundColor(AppTheme.text.opacity(0.9))
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(alignment: .lastTextBaseline, spacing: 8) {
                             Text("\(rememberedCount)")
                                 .font(.system(size: 56, weight: .bold))
-                                .foregroundStyle(.cyan)
+                                .foregroundStyle(AppTheme.accent)
                             
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("sent")
                                     .font(.subheadline)
                                     .fontWeight(.medium)
-                                    .foregroundColor(.white.opacity(0.8))
+                                    .foregroundColor(AppTheme.text.opacity(0.8))
                                 Text("messages")
                                     .font(.caption)
-                                    .foregroundColor(.white.opacity(0.6))
+                                    .foregroundColor(AppTheme.text.opacity(0.6))
                             }
                         }
                     }
@@ -626,37 +452,11 @@ struct AchievementCardView: View {
 
                 Image(systemName: "party.popper.fill")
                     .font(.system(size: 44))
-                    .foregroundStyle(.yellow)
+                    .foregroundStyle(AppTheme.celebration)
                     .padding(.trailing, 24)
             }
         }
         .frame(height: 170)
-    }
-}
-
-// MARK: - Birthday Card
-
-struct BdayCard: View {
-    var contact: Contact
-
-    var body: some View {
-        GlassCard(intensity: .strong) {
-            HStack(alignment: .center, spacing: 16) {
-                ContactPhotoView(name: contact.name, thumbnailData: contact.thumbnailData, size: 56)
-
-                Text(contact.name)
-                    .font(.title3)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.white)
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .foregroundColor(.white.opacity(0.4))
-                    .font(.system(size: 16, weight: .bold))
-            }
-            .padding(24)
-        }
     }
 }
 
@@ -672,28 +472,21 @@ struct EditView: View {
 
     var body: some View {
         ZStack {
-            // Simple solid background
             AppTheme.background
                 .ignoresSafeArea()
 
             VStack(spacing: 32) {
-                // Header
                 VStack(spacing: 8) {
                     ContactPhotoView(name: contact.name, thumbnailData: contact.thumbnailData, size: 88)
-                    Text("Send Birthday Message")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
-                    
                     Text(contact.name)
                         .font(.title3)
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(AppTheme.text.opacity(0.7))
                 }
-                .padding(.top, 40)
+                .padding(.top, 20)
 
                 // Birthday info card
                 if let birthday = contact.birthday {
-                    GlassCard {
+                    LiquidGlassCard {
                         VStack(spacing: 16) {
                             Image(systemName: "birthday.cake.fill")
                                 .font(.system(size: 56))
@@ -702,12 +495,12 @@ struct EditView: View {
                             Text(formatBirthday(birthday))
                                 .font(.title2)
                                 .fontWeight(.semibold)
-                                .foregroundColor(.white)
+                                .foregroundColor(AppTheme.text)
                             
                             if settings.showAgeTurning, contact.hasKnownBirthYear, let age = contact.ageTurning {
                                 Text("Turning \(age)")
                                     .font(.headline)
-                                    .foregroundColor(.white.opacity(0.75))
+                                    .foregroundColor(AppTheme.text.opacity(0.75))
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -718,7 +511,6 @@ struct EditView: View {
 
                 Spacer()
 
-                // Send button
                 Button(action: {
                     let cnContact = convertToCNContact(contact)
                     messageVM.startBirthdayFlow(with: [cnContact], thumbnailData: [contact.thumbnailData])
@@ -729,17 +521,16 @@ struct EditView: View {
                         Text("Send Message")
                             .font(.headline)
                     }
-                    .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 18)
-                    .background(Color.blue)
-                    .cornerRadius(16)
-                    .shadow(color: Color.black.opacity(0.3), radius: 15, x: 0, y: 8)
                 }
+                .primaryGlassButton()
+                .tint(.blue)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 40)
             }
         }
+        .largeNavigationTitle("Send Birthday Message")
         .sheet(isPresented: $messageVM.showTemplatePicker) {
             MessageTemplatePickerView(messageVM: messageVM)
         }
@@ -759,16 +550,17 @@ struct EditView: View {
                 .ignoresSafeArea()
             } else {
                 ZStack {
-                    Color.black.ignoresSafeArea()
+                    AppTheme.background.ignoresSafeArea()
                     VStack(spacing: 20) {
-                        Text("Cannot Send Messages").font(.headline).foregroundColor(.white)
+                        Text("Cannot Send Messages").font(.headline).foregroundColor(AppTheme.text)
                         Text("This device is not configured to send messages.")
                             .multilineTextAlignment(.center)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(AppTheme.text.opacity(0.7))
                         Button("OK") {
                             messageVM.showComposer = false
                         }
-                        .modernButtonStyle()
+                        .primaryGlassButton()
+                        .tint(.blue)
                     }
                     .padding()
                 }
@@ -807,7 +599,7 @@ struct EditView: View {
         case 10: return Color(red: 0.90, green: 0.45, blue: 0.25) // October — pumpkin
         case 11: return Color(red: 0.70, green: 0.50, blue: 0.85) // November — plum
         case 12: return Color(red: 0.40, green: 0.70, blue: 0.90) // December — winter blue
-        default: return .cyan
+        default: return AppTheme.accent
         }
     }
 
@@ -849,62 +641,56 @@ struct addMissingView: View {
             AppTheme.background
                 .ignoresSafeArea()
 
-            ScrollView {
-                LazyVStack(spacing: 16) {
-                    VStack(spacing: 10) {
-                        Image(systemName: "person.crop.circle.badge.plus")
-                            .font(.system(size: 40))
-                            .foregroundStyle(.cyan)
-                        Text("Add Missing Birthdays")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .foregroundStyle(.white)
-                    }
-                    .padding(.top, 20)
-
-                    if contactsVM.isLoadingMissing && contactsVM.contactsWithoutBirthday.isEmpty {
-                        ProgressView()
-                            .tint(.white)
-                            .padding(.top, 40)
-                    } else if contactsVM.contactsWithoutBirthday.isEmpty {
-                        GlassCard {
+            Group {
+                if contactsVM.isLoadingMissing && contactsVM.contactsWithoutBirthday.isEmpty {
+                    ProgressView()
+                        .tint(AppTheme.text)
+                } else if contactsVM.contactsWithoutBirthday.isEmpty {
+                    ScrollView {
+                        LiquidGlassCard(padding: 32) {
                             VStack(spacing: 16) {
                                 Image(systemName: "checkmark.seal.fill")
                                     .font(.system(size: 52))
-                                    .foregroundStyle(.cyan)
+                                    .foregroundStyle(AppTheme.accent)
                                 Text("No Birthdays Missing!")
                                     .font(.title2)
                                     .fontWeight(.bold)
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(AppTheme.text)
                                 Text("All your contacts have birthdays")
                                     .font(.subheadline)
-                                    .foregroundStyle(.white.opacity(0.7))
+                                    .foregroundStyle(AppTheme.text.opacity(0.7))
                             }
-                            .padding(32)
                         }
                         .padding(.horizontal, 20)
-                    } else {
-                        addMissingSearchBar(text: $searchText)
-                            .padding(.horizontal, 20)
-
-                        ForEach(filteredContacts) { contact in
-                            addMissingCard(contact: contact) {
-                                editingContactID = ContactSheetTarget(id: contact.id)
+                        .padding(.top, 20)
+                    }
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(filteredContacts) { contact in
+                                addMissingCard(contact: contact) {
+                                    editingContactID = ContactSheetTarget(id: contact.id)
+                                }
                             }
                         }
+                        .padding(.bottom, 24)
                     }
                 }
-                .padding(.bottom, 24)
             }
         }
+        .largeNavigationTitle("Add Missing Birthdays")
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Search contacts"
+        )
         .task {
             contactsVM.loadMissingBirthdayContactsIfNeeded()
         }
         .sheet(item: $editingContactID, onDismiss: refreshContactsAfterEditing) { target in
-            ContactEditorRepresentable(contactID: target.id) {
+            ContactSheetView(contactID: target.id, allowsEditing: true) {
                 editingContactID = nil
             }
-            .ignoresSafeArea()
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
@@ -919,55 +705,19 @@ struct addMissingView: View {
     }
 }
 
-private struct addMissingSearchBar: View {
-    @Binding var text: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.white.opacity(0.55))
-
-            TextField("", text: $text, prompt: Text("Search contacts").foregroundColor(.white.opacity(0.45)))
-                .foregroundStyle(.white)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-
-            if !text.isEmpty {
-                Button {
-                    text = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.white.opacity(0.45))
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(AppTheme.surface.opacity(0.6))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                )
-        )
-    }
-}
-
 struct addMissingCard: View {
     let contact: Contact
     let onAddBirthday: () -> Void
 
     var body: some View {
-        GlassCard(intensity: .strong) {
+        ContactGlassRow(padding: 16) {
             HStack(spacing: 12) {
                 ContactPhotoView(name: contact.name, thumbnailData: contact.thumbnailData, size: 36)
 
                 Text(contact.name)
                     .font(.body)
                     .fontWeight(.semibold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(AppTheme.text)
                     .lineLimit(1)
 
                 Spacer(minLength: 8)
@@ -975,16 +725,11 @@ struct addMissingCard: View {
                 Button(action: onAddBirthday) {
                     Image(systemName: "calendar.badge.plus")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.white)
                         .frame(width: 44, height: 44)
-                        .background(Color.purple)
-                        .clipShape(Circle())
                 }
-                .buttonStyle(.plain)
+                .glassCircleButton()
                 .accessibilityLabel("Add birthday")
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
         }
         .padding(.horizontal, 20)
     }
@@ -992,10 +737,72 @@ struct addMissingCard: View {
 
 // MARK: - Contact editor (system Contacts UI)
 
-private final class ContactEditorNavigationController: UINavigationController {
+/// Hosts CNContactViewController directly. Dismiss comes from the system nav bar item
+/// installed by `ContactSheetNavigationController`, plus swipe-to-dismiss.
+private struct ContactSheetView: View {
+    let contactID: String
+    var allowsEditing = true
+    var onComplete: () -> Void
+
+    var body: some View {
+        ContactEditorRepresentable(
+            contactID: contactID,
+            allowsEditing: allowsEditing,
+            onComplete: onComplete
+        )
+        .presentationDragIndicator(.visible)
+        .interactiveDismissDisabled(false)
+    }
+}
+
+/// CNContactViewController replaces navigation items after load; re-apply dismiss
+/// on every appearance so Done/Cancel stays visible in the system nav bar too.
+private final class ContactSheetNavigationController: UINavigationController {
+    var onDismiss: (() -> Void)?
+    var dismissSystemItem: UIBarButtonItem.SystemItem = .done
+    var startsInEditMode = false
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        navigationBar.isHidden = false
+        isNavigationBarHidden = false
+        installDismissButton()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        setNavigationBarHidden(false, animated: false)
+        installDismissButton()
+    }
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        (topViewController as? CNContactViewController)?.setEditing(true, animated: false)
+        setNavigationBarHidden(false, animated: false)
+        if startsInEditMode {
+            (topViewController as? CNContactViewController)?.setEditing(true, animated: false)
+        }
+        installDismissButton()
+        DispatchQueue.main.async { [weak self] in
+            self?.installDismissButton()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            self?.installDismissButton()
+        }
+    }
+
+    private func installDismissButton() {
+        guard let contactVC = viewControllers.first else { return }
+        let item = UIBarButtonItem(
+            barButtonSystemItem: dismissSystemItem,
+            target: self,
+            action: #selector(dismissTapped)
+        )
+        contactVC.navigationItem.leftBarButtonItem = item
+        contactVC.navigationItem.hidesBackButton = true
+    }
+
+    @objc private func dismissTapped() {
+        onDismiss?()
     }
 }
 
@@ -1021,11 +828,26 @@ private struct ContactEditorRepresentable: UIViewControllerRepresentable {
         contactVC.allowsActions = true
         contactVC.contactStore = store
         contactVC.delegate = context.coordinator
+
+        // Set the dismiss item on the contact VC itself before wrapping — viewDidLoad
+        // of a wrapping nav is too early; ContactsUI overwrites items as it appears.
+        let dismissItem = UIBarButtonItem(
+            barButtonSystemItem: allowsEditing ? .cancel : .done,
+            target: context.coordinator,
+            action: #selector(Coordinator.dismissTapped)
+        )
+        contactVC.navigationItem.leftBarButtonItem = dismissItem
+        contactVC.navigationItem.hidesBackButton = true
+
         if allowsEditing {
             contactVC.setEditing(true, animated: false)
-            return ContactEditorNavigationController(rootViewController: contactVC)
         }
-        return UINavigationController(rootViewController: contactVC)
+
+        let nav = ContactSheetNavigationController(rootViewController: contactVC)
+        nav.onDismiss = onComplete
+        nav.dismissSystemItem = allowsEditing ? .cancel : .done
+        nav.startsInEditMode = allowsEditing
+        return nav
     }
 
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
@@ -1035,6 +857,10 @@ private struct ContactEditorRepresentable: UIViewControllerRepresentable {
 
         init(onComplete: @escaping () -> Void) {
             self.onComplete = onComplete
+        }
+
+        @objc func dismissTapped() {
+            onComplete()
         }
 
         func contactViewController(_ viewController: CNContactViewController, didCompleteWith contact: CNContact?) {
@@ -1048,14 +874,18 @@ private struct ContactEditorErrorView: View {
 
     var body: some View {
         NavigationStack {
-            ContentUnavailableView(
-                "Contact Not Found",
-                systemImage: "person.crop.circle.badge.exclamationmark",
-                description: Text("This contact could not be opened.")
-            )
+            ZStack {
+                AppTheme.background.ignoresSafeArea()
+                ContentUnavailableView(
+                    "Contact Not Found",
+                    systemImage: "person.crop.circle.badge.exclamationmark",
+                    description: Text("This contact could not be opened.")
+                )
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done", action: onDismiss)
+                        .secondaryGlassButton()
                 }
             }
         }
@@ -1080,69 +910,32 @@ struct BrowseBirthdaysView: View {
 
     var body: some View {
         ZStack {
-            // Simple solid background
             AppTheme.background
                 .ignoresSafeArea()
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("Browse Birthdays", systemImage: "calendar")
-                            .font(.title.bold())
-                            .foregroundStyle(.white)
-                            .labelStyle(.titleAndIcon)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
-
-                    // Simple tab selector
                     HStack(spacing: 12) {
-                        Button(action: {
+                        browseModeButton(
+                            title: "Calendar",
+                            isSelected: selectedTab == .calendar
+                        ) {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                 selectedTab = .calendar
                             }
-                        }) {
-                            Label("Calendar", systemImage: "calendar")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .fill(selectedTab == .calendar ? Color.blue : AppTheme.surface.opacity(0.5))
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 16)
-                                                .stroke(Color.white.opacity(selectedTab == .calendar ? 0.3 : 0.15), lineWidth: 1)
-                                        )
-                                )
                         }
 
-                        Button(action: {
+                        browseModeButton(
+                            title: "By Month",
+                            isSelected: selectedTab == .byMonth
+                        ) {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                 selectedTab = .byMonth
                             }
-                        }) {
-                            Label("By Month", systemImage: "list.bullet")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .fill(selectedTab == .byMonth ? Color.blue : AppTheme.surface.opacity(0.5))
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 16)
-                                                .stroke(Color.white.opacity(selectedTab == .byMonth ? 0.3 : 0.15), lineWidth: 1)
-                                        )
-                                )
                         }
                     }
                     .padding(.horizontal, 20)
+                    .padding(.top, 8)
 
                     if selectedTab == .byMonth {
                         ByMonthView(
@@ -1163,12 +956,29 @@ struct BrowseBirthdaysView: View {
                 .padding(.bottom, 32)
             }
         }
+        .largeNavigationTitle("Browse")
         .sheet(item: $viewingContactID) { target in
-            ContactEditorRepresentable(contactID: target.id, allowsEditing: false) {
+            ContactSheetView(contactID: target.id, allowsEditing: false) {
                 viewingContactID = nil
             }
-            .ignoresSafeArea()
         }
+    }
+
+    @ViewBuilder
+    private func browseModeButton(
+        title: String,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+        }
+        .browseGlassButtonStyle(isProminent: isSelected)
+        .if(isSelected, transform: { $0.tint(.blue) }, else: { $0 })
     }
 }
 
@@ -1186,18 +996,17 @@ struct ByMonthView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 12) {
-                Label("Select Month", systemImage: "calendar")
+                Text("Select Month")
                     .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(AppTheme.text.opacity(0.7))
                     .padding(.horizontal, 24)
-                
-                GlassCard(intensity: .strong) {
+
+                ContactGlassRow {
                     Picker("Select Month", selection: $selectedMonth) {
                         ForEach(months, id: \.self) { Text($0).tag($0) }
                     }
-                    .pickerStyle(MenuPickerStyle())
-                    .accentColor(.white)
-                    .padding(20)
+                    .pickerStyle(.menu)
+                    .tint(AppTheme.text)
                 }
                 .padding(.horizontal, 24)
             }
@@ -1206,7 +1015,7 @@ struct ByMonthView: View {
                 Text("\(selectedMonth) Birthdays (\(monthContacts.count))")
                     .font(.title2)
                     .fontWeight(.bold)
-                    .foregroundColor(.white)
+                    .foregroundColor(AppTheme.text)
                     .padding(.horizontal, 24)
 
                 LazyVStack(spacing: 16) {
@@ -1222,14 +1031,14 @@ struct ByMonthView: View {
         Button {
             onContactTap(contact.id)
         } label: {
-            GlassCard(intensity: .strong) {
+            ContactGlassRow {
                 HStack(spacing: 16) {
                     birthdayDateBadge(for: contact.displayBirthdayDate ?? contact.comparableBirthday!)
 
                     ContactPhotoView(name: contact.name, thumbnailData: contact.thumbnailData, size: 44)
 
                     Text(contact.name)
-                        .foregroundColor(.white)
+                        .foregroundColor(AppTheme.text)
                         .font(.headline)
                         .fontWeight(.semibold)
 
@@ -1237,17 +1046,16 @@ struct ByMonthView: View {
 
                     if settings.showAgeTurning, contact.hasKnownBirthYear, let age = contact.ageTurning {
                         Text("Turning \(age)")
-                            .foregroundColor(.white.opacity(0.65))
+                            .foregroundColor(AppTheme.text.opacity(0.65))
                             .font(.subheadline)
                             .fontWeight(.medium)
                     }
 
                     Image(systemName: "chevron.right")
-                        .foregroundColor(.white.opacity(0.4))
+                        .foregroundColor(AppTheme.text.opacity(0.4))
                         .font(.caption)
                         .fontWeight(.bold)
                 }
-                .padding(20)
             }
         }
         .buttonStyle(.plain)
@@ -1257,22 +1065,22 @@ struct ByMonthView: View {
     private func birthdayDateBadge(for date: Date) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(red: 0.15, green: 0.2, blue: 0.4).opacity(0.7))
+                .fill(AppTheme.badgeFill.opacity(0.7))
                 .frame(width: 56, height: 56)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.white.opacity(0.25), lineWidth: 1.5)
+                        .stroke(AppTheme.text.opacity(0.25), lineWidth: 1.5)
                 )
 
             VStack(spacing: 2) {
                 Text(date.monthAbbrev())
                     .font(.caption2)
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(AppTheme.text.opacity(0.8))
                     .fontWeight(.semibold)
                 Text(date.day())
                     .font(.title3)
                     .fontWeight(.bold)
-                    .foregroundColor(.white)
+                    .foregroundColor(AppTheme.text)
             }
         }
     }
@@ -1286,7 +1094,7 @@ struct CalendarView: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            GlassCard(intensity: .strong) {
+            LiquidGlassCard(padding: 8) {
                 BirthdayCalendarRepresentable(
                     selectedDate: $selectedDate,
                     contactsVM: contactsVM
@@ -1301,7 +1109,7 @@ struct CalendarView: View {
 
             VStack(alignment: .leading, spacing: 12) {
                 Text("Selected: \(selectedDate.formattedDate())")
-                    .foregroundColor(.white.opacity(0.7))
+                    .foregroundColor(AppTheme.text.opacity(0.7))
                     .font(.subheadline)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
@@ -1313,13 +1121,13 @@ struct CalendarView: View {
                 }
                 
                 if contactsVM.contactsPerDate(date: selectedDate).isEmpty {
-                    GlassCard {
+                    LiquidGlassCard(padding: 24) {
                         VStack(spacing: 12) {
                             Image(systemName: "calendar.badge.exclamationmark")
                                 .font(.system(size: 40))
-                                .foregroundStyle(Color.cyan)
+                                .foregroundStyle(AppTheme.accent)
                             Text("No birthdays on this date")
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(AppTheme.text.opacity(0.7))
                                 .font(.subheadline)
                         }
                         .frame(maxWidth: .infinity)
@@ -1337,40 +1145,21 @@ struct CalendarView: View {
         Button {
             onContactTap(contact.id)
         } label: {
-            GlassCard(intensity: .strong) {
+            ContactGlassRow {
                 HStack(spacing: 16) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color(red: 0.15, green: 0.2, blue: 0.4).opacity(0.7))
-                            .frame(width: 56, height: 56)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Color.white.opacity(0.25), lineWidth: 1.5)
-                            )
-
-                        VStack(spacing: 2) {
-                            Text(selectedDate.monthAbbrev())
-                                .font(.caption2)
-                                .foregroundColor(.white.opacity(0.8))
-                                .fontWeight(.semibold)
-                            Text(selectedDate.day())
-                                .font(.title3)
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                        }
-                    }
+                    birthdayDateBadge(for: selectedDate)
 
                     ContactPhotoView(name: contact.name, thumbnailData: contact.thumbnailData, size: 44)
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text(contact.name)
-                            .foregroundColor(.white)
+                            .foregroundColor(AppTheme.text)
                             .font(.headline)
                             .fontWeight(.semibold)
 
                         if settings.showAgeTurning, contact.hasKnownBirthYear, let age = contact.ageTurning {
                             Text("Turning \(age)")
-                                .foregroundColor(.white.opacity(0.65))
+                                .foregroundColor(AppTheme.text.opacity(0.65))
                                 .font(.caption)
                                 .fontWeight(.medium)
                         }
@@ -1379,27 +1168,53 @@ struct CalendarView: View {
                     Spacer()
 
                     Image(systemName: "chevron.right")
-                        .foregroundColor(.white.opacity(0.4))
+                        .foregroundColor(AppTheme.text.opacity(0.4))
                         .font(.caption)
                         .fontWeight(.bold)
                 }
-                .padding(20)
             }
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 24)
     }
+
+    private func birthdayDateBadge(for date: Date) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 16)
+                .fill(AppTheme.badgeFill.opacity(0.7))
+                .frame(width: 56, height: 56)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(AppTheme.text.opacity(0.25), lineWidth: 1.5)
+                )
+
+            VStack(spacing: 2) {
+                Text(date.monthAbbrev())
+                    .font(.caption2)
+                    .foregroundColor(AppTheme.text.opacity(0.8))
+                    .fontWeight(.semibold)
+                Text(date.day())
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(AppTheme.text)
+            }
+        }
+    }
 }
 
-// MARK: - Button Style Extension
+// MARK: - View helpers
 
-extension View {
-    func modernButtonStyle() -> some View {
-        self
-            .padding(.horizontal, 24)
-            .padding(.vertical, 14)
-            .background(Color.blue)
-            .cornerRadius(14)
-            .shadow(color: Color.black.opacity(0.3), radius: 12, x: 0, y: 6)
+private extension View {
+    @ViewBuilder
+    func `if`<TrueContent: View, FalseContent: View>(
+        _ condition: Bool,
+        transform: (Self) -> TrueContent,
+        else elseTransform: (Self) -> FalseContent
+    ) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            elseTransform(self)
+        }
     }
 }
